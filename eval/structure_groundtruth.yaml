@@ -184,9 +184,10 @@ expected_findings:
       to: phishforge-api
       evidence:
         - phishforge-api/docs/integracao_api.md:37    # "o unico cliente legitimo hoje e o backend Go"
-        - phishforge-api/docs/integracao_api.md:143   # integracao via phishing-quest-api #62, que ainda nao existe
+        - phishforge-api/docs/integracao_api.md:143-144  # integracao via phishing-quest-api #62, que ainda nao existe
         - phishforge-api/app/api/router.py:11         # require_api_key pensado para o backend Go
       code: nenhuma chamada HTTP de saida no Go (busca por http.Get/Post/NewRequest e por /api/v1/generate)
   unused_features:
     - endpoint: phishing-quest-api:GET /api/v1/rankings
-      evidence: phishing_quest/lib/app/modules/ranking/ranking_controller.dart:28   # MockData.ranking
+      evidence: phishing_quest/lib/app/data/repositories/ranking/ranking_repository.dart:9-11  # TODO + return MockData.ranking
+      also: phishing_quest/lib/app/modules/ranking/ranking_controller.dart:28  # so o fallback do catch
