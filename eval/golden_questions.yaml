@@ -1,0 +1,448 @@
+# Perguntas de ouro da PoC (fase 0): 20 nao tecnicas e 20 tecnicas.
+#
+# Cada pergunta diz o que a resposta precisa conter (`deve_conter`), o que ela
+# nao pode conter (`nao_pode_conter`, quando houver) e onde esta a fonte. Na
+# fase 5 cada resposta e corrigida contra estes itens: acerto >= 80% e fonte
+# correta >= 90% (docs/fundamentacao.md, secao Avaliacao).
+#
+# `camada` diz de onde a resposta deve sair: estrutura (extracao do codigo),
+# documentacao (docs e resumos) ou experiencia (episodios semeados ou
+# registrados). Fontes no formato repo/caminho:linha, nos commits fixados.
+
+perguntas:
+  # ---------------------------------------------------------------- nao tecnicas
+  - id: n01
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: O que é o PhishForge e para que serve?
+    deve_conter:
+      - ferramenta educacional que gera exemplos de phishing com IA
+      - objetivo de conscientizar e treinar pessoas contra phishing
+    fontes: [phishforge-api/README.md:3]
+
+  - id: n02
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: O que é o Phishing Quest?
+    deve_conter:
+      - app (Flutter) de treino contra phishing em forma de jogo, com perguntas por categoria
+      - o jogador responde e a API registra as respostas, tentativas e avaliações
+      - o README do app não descreve o projeto; a resposta vem do código e da API
+    fontes:
+      - phishing_quest/lib/app/data/repositories/game/game_repository.dart:21
+      - phishing-quest-api/adapter/http/router/game_router.go:16
+      - phishing-quest-api/adapter/http/router/category_router.go:13
+
+  - id: n03
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: Qual a diferença entre o Phishing Quest e o PhishForge?
+    deve_conter:
+      - o PhishForge gera e cura exemplos de phishing
+      - o Phishing Quest é o jogo em que as pessoas treinam
+      - a ligação entre os dois ainda é só planejada (o backend Go seria cliente da geração)
+    fontes:
+      - phishforge-api/README.md:3
+      - phishforge-api/docs/integracao_api.md:37
+      - phishforge-api/docs/integracao_api.md:143
+
+  - id: n04
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Como um especialista avalia um exemplo gerado?
+    deve_conter:
+      - entra com um código de acesso emitido pelo pesquisador e recebe uma sessão
+      - aceita o TCLE (consentimento) e preenche o perfil antes de avaliar
+      - avalia os itens um a um, por ordem, usando o vocabulário de pistas
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/expert.py:88
+      - phishforge-api/app/api/v1/endpoints/expert.py:139
+      - phishforge-api/app/api/v1/endpoints/expert.py:243
+      - phishforge-frontend/src/services/expertApiService.ts:17
+
+  - id: n05
+    publico: nao_tecnico
+    camada: experiencia
+    pergunta: O que aprendemos comparando geração com e sem RAG?
+    deve_conter:
+      - sem RAG é cerca de 8 vezes mais rápido (≈10 s contra ≈83 s em média)
+      - a recomendação foi manter o RAG pela fundamentação, consistência e rastreabilidade
+      - sem RAG pode existir como modo rápido para demos e testes
+    fontes:
+      - phishforge-api/docs/analise_rag_vs_no_rag.md:34
+      - phishforge-api/docs/analise_rag_vs_no_rag.md:238
+
+  - id: n06
+    publico: nao_tecnico
+    camada: experiencia
+    pergunta: Zero-shot ou chain-of-thought, qual forma de pedir ao modelo funcionou melhor?
+    deve_conter:
+      - zero-shot foi recomendado para produção com RAG
+      - fidelidade ao contexto cerca de 4 vezes maior (0,137 contra 0,033)
+      - relevância das respostas praticamente igual; CoT foi cerca de 8% mais rápido
+    fontes:
+      - phishforge-api/docs/analise_zero_shot_vs_cot.md:27
+      - phishforge-api/docs/analise_zero_shot_vs_cot.md:189
+
+  - id: n07
+    publico: nao_tecnico
+    camada: experiencia
+    pergunta: A implementação do PhishForge está de acordo com o artigo acadêmico?
+    deve_conter:
+      - alinhamento avaliado como 97%
+      - divergências pequenas, como o tamanho de chunk na configuração e o modelo de LLM não citado no artigo
+    fontes:
+      - phishforge-api/docs/analise_alinhamento_artigo.md:9
+      - phishforge-api/docs/analise_alinhamento_artigo.md:477
+
+  - id: n08
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Quais canais de phishing o PhishForge consegue gerar hoje?
+    deve_conter:
+      - hoje a geração está restrita a e-mail
+      - existem outros 5 canais no modelo (SMS, WhatsApp, site, ligação, Pix QR), ainda inalcançáveis pelas rotas
+    fontes:
+      - phishforge-api/app/domain/models/channel.py:23
+
+  - id: n09
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Quais níveis de dificuldade os exemplos podem ter?
+    deve_conter:
+      - fácil, médio e difícil
+    fontes: [phishforge-api/app/domain/models/difficulty.py:19]
+
+  - id: n10
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: O ranking do app Phishing Quest já funciona?
+    deve_conter:
+      - não; o app mostra dados fictícios (mock)
+      - a API já tem a rota de ranking, mas o app não a chama
+    fontes:
+      - phishing_quest/lib/app/modules/ranking/ranking_controller.dart:28
+      - phishing-quest-api/adapter/http/router/ranking_router.go:11
+
+  - id: n11
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: O que é uma pista (cue) de phishing nesses projetos?
+    deve_conter:
+      - sinal que denuncia um phishing, usado para anotar e avaliar exemplos
+      - a taxonomia de pistas é compartilhada entre as duas APIs (10 códigos com os mesmos identificadores)
+    fontes:
+      - phishforge-api/docs/integracao_api.md:160
+      - phishforge-api/app/api/v1/endpoints/expert.py:203
+
+  - id: n12
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: Qualquer pessoa na internet pode gerar exemplos pelo site do PhishForge?
+    deve_conter:
+      - não; por padrão o servidor do site só libera as áreas de especialista e de pesquisador
+      - a geração só passa com a curadoria ligada, em ambiente local ou interno, porque gasta crédito de API de IA
+    fontes:
+      - phishforge-frontend/nginx.conf.template:40
+      - phishforge-frontend/README.md:58
+
+  - id: n13
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Um especialista pode desistir de participar da avaliação?
+    deve_conter:
+      - sim; a API tem revogação de acesso por conta própria, sempre disponível (LGPD)
+      - o site ainda não oferece esse botão (nenhuma chamada à rota de revogação)
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/expert.py:180
+      - eval/structure_groundtruth.yaml
+
+  - id: n14
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: O que o pesquisador consegue fazer no console?
+    deve_conter:
+      - criar, abrir e encerrar rodadas de avaliação e escolher os itens
+      - emitir e reemitir códigos de acesso para especialistas
+      - ver o resumo da rodada e exportar os dados
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/researcher.py:69
+      - phishforge-api/app/api/v1/endpoints/researcher.py:172
+      - phishforge-api/app/api/v1/endpoints/researcher.py:247
+
+  - id: n15
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Quais projetos estão nesta base e como eles se conectam?
+    deve_conter:
+      - dois projetos e quatro repositórios (PhishForge API e site; Phishing Quest API e app)
+      - o site chama a API do PhishForge e o app chama a API do Phishing Quest
+      - entre os dois projetos a integração ainda é só documentada
+    fontes:
+      - config/repos.yaml
+      - eval/structure_groundtruth.yaml
+
+  - id: n16
+    publico: nao_tecnico
+    camada: experiencia
+    pergunta: Por que o cadastro de usuários do app falhava e como foi resolvido?
+    deve_conter:
+      - o app chamava um endereço que a API não tinha, e o cadastro dava erro 404
+      - a decisão foi manter o endereço da API e ajustar só o app
+      - criar um segundo endereço na API foi descartado
+    fontes: [phishing-quest-api/docs/decisoes/0001-path-registro-usuario.md:13]
+
+  - id: n17
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: Onde ficam os artigos que o PhishForge usa como base?
+    deve_conter:
+      - numa base vetorial (Qdrant), na coleção phishing_articles
+      - a base já vem indexada num snapshot versionado no repositório
+    fontes: [phishforge-api/README.md:52]
+
+  - id: n18
+    publico: nao_tecnico
+    camada: documentacao
+    pergunta: Quais tecnologias o PhishForge usa?
+    deve_conter:
+      - LangChain, Qdrant, FastAPI, Poetry e Docker Compose
+      - site em React com Vite
+    fontes:
+      - phishforge-api/README.md:5
+      - phishforge-frontend/package.json
+
+  - id: n19
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: O que o especialista precisa aceitar antes de avaliar, e o que acontece se o termo mudar?
+    deve_conter:
+      - o TCLE na versão vigente da rodada
+      - sem esse consentimento nenhum item é entregue, mesmo se o termo mudar no meio da coleta
+    fontes: [phishforge-api/app/api/v1/endpoints/expert.py:192]
+
+  - id: n20
+    publico: nao_tecnico
+    camada: estrutura
+    pergunta: Por quanto tempo vale a sessão de um especialista?
+    deve_conter:
+      - 12 horas, sem renovação automática
+    fontes: [phishforge-api/app/api/v1/endpoints/expert.py:97]
+
+  # ---------------------------------------------------------------- tecnicas
+  - id: t01
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quais rotas o app chama, e quais a Quest API tem que o app não usa?
+    deve_conter:
+      - 6 chamadas: categorias, perguntas da categoria, respostas da pergunta, game/answer, login e registro
+      - 39 das 45 rotas da Quest API não têm cliente no app, entre elas GET /api/v1/rankings
+    fontes: [eval/structure_groundtruth.yaml]
+
+  - id: t02
+    publico: tecnico
+    camada: estrutura
+    pergunta: Se o shape de `links` mudar, o que quebra?
+    deve_conter:
+      - o linkRef {text, href} do Go em item_draft_service.go espelha o LinkRef da phishforge-api
+      - o buildDraftContent dos canais email, sms e whatsapp monta esse shape
+      - a pista link_text_mismatch depende de texto e destino separados
+    fontes:
+      - phishing-quest-api/core/service/item_draft_service.go:72
+      - phishforge-api/app/domain/models/link_ref.py:4
+
+  - id: t03
+    publico: tecnico
+    camada: documentacao
+    pergunta: Por que o Postgres da PhishForge não publica a porta?
+    deve_conter:
+      - a phishing-quest-api também usa a 5432 e os dois stacks precisam subir juntos
+    fontes: [phishforge-api/README.md:56]
+
+  - id: t04
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quem chama POST /api/v1/evaluate/user-answer?
+    deve_conter:
+      - ninguém nos quatro repositórios; é uma rota sem cliente
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/generator.py:427
+      - eval/structure_groundtruth.yaml
+
+  - id: t05
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quais rotas da phishforge-api não têm cliente?
+    deve_conter:
+      - GET /api/v1/cues
+      - POST /api/v1/evaluate/user-answer
+      - POST /api/v1/expert/revogacao
+    fontes: [eval/structure_groundtruth.yaml]
+
+  - id: t06
+    publico: tecnico
+    camada: estrutura
+    pergunta: Como as rotas da phishforge-api são autenticadas?
+    deve_conter:
+      - geração e curadoria pedem X-API-Key servidor-a-servidor, aplicada no include_router
+      - rotas de especialista usam JWT próprio (require_expert)
+      - rotas de pesquisador usam uma terceira chave (require_researcher)
+    fontes:
+      - phishforge-api/app/api/router.py:11
+      - phishforge-api/app/api/v1/endpoints/expert.py:44
+      - phishforge-api/app/api/v1/endpoints/researcher.py:44
+
+  - id: t07
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quais rotas o frontend chama na phishforge-api, e de quais arquivos?
+    deve_conter:
+      - 27 chamadas
+      - 7 em src/services/apiService.ts, 8 em expertApiService.ts e 12 em researcherApiService.ts
+    fontes: [eval/structure_groundtruth.yaml]
+
+  - id: t08
+    publico: tecnico
+    camada: documentacao
+    pergunta: Como o frontend chega na API em produção?
+    deve_conter:
+      - nginx no mesmo domínio faz proxy de /api/v1/expert/ e /api/v1/researcher/ sem injetar chave
+      - o resto de /api/v1 só passa com CURATION_ENABLED=1, e aí o nginx injeta a chave servidor-a-servidor
+      - em desenvolvimento a base vem de VITE_API_BASE_URL (padrão localhost:8000)
+    fontes:
+      - phishforge-frontend/nginx.conf.template:14
+      - phishforge-frontend/src/services/http.ts:2
+
+  - id: t09
+    publico: tecnico
+    camada: documentacao
+    pergunta: Onde está a lógica de geração de e-mails na phishforge-api?
+    deve_conter:
+      - em app/domain/services, com o pipeline de geração, o gerador de respostas, o normalizador de prompt e o reranker
+    fontes:
+      - phishforge-api/app/domain/services/generation_pipeline.py
+      - phishforge-api/app/domain/services/response_generator.py
+
+  - id: t10
+    publico: tecnico
+    camada: experiencia
+    pergunta: Que técnicas de RAG a phishforge-api implementa?
+    deve_conter:
+      - HyDE, re-ranking, small-to-big retrieval e chain-of-thought
+      - índice no Qdrant
+    fontes: [phishforge-api/docs/analise_alinhamento_artigo.md:475]
+
+  - id: t11
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quais bancos de dados cada API usa?
+    deve_conter:
+      - phishforge-api usa Postgres e Qdrant (coleção phishing_articles)
+      - phishing-quest-api usa Postgres
+    fontes:
+      - phishforge-api/docker-compose.yml
+      - phishing-quest-api/docker-compose.yml
+
+  - id: t12
+    publico: tecnico
+    camada: estrutura
+    pergunta: Onde ficam as migrations de cada API e com que ferramenta rodam?
+    deve_conter:
+      - Flyway nas duas
+      - pasta migrate/ de cada repo; a Quest API tem configuração separada para produção
+    fontes:
+      - phishforge-api/migrate/flyway.config
+      - phishing-quest-api/migrate/flyway-prod.config
+
+  - id: t13
+    publico: tecnico
+    camada: estrutura
+    pergunta: Em que repos existe GET /api/v1/cues, e qual rota de pistas o frontend usa?
+    deve_conter:
+      - a rota existe nas duas APIs
+      - o frontend usa GET /api/v1/expert/cues; ninguém chama GET /api/v1/cues
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/generator.py:321
+      - phishing-quest-api/adapter/http/router/cue_router.go:13
+      - phishforge-frontend/src/services/expertApiService.ts:45
+
+  - id: t14
+    publico: tecnico
+    camada: estrutura
+    pergunta: Se POST /api/v1/game/answer mudar, o que é afetado?
+    deve_conter:
+      - o GameRepository do app (game_repository.dart:21)
+      - o handler SubmitAnswer da Quest API, num grupo que exige login
+    fontes:
+      - phishing_quest/lib/app/data/repositories/game/game_repository.dart:21
+      - phishing-quest-api/adapter/http/router/game_router.go:14
+
+  - id: t15
+    publico: tecnico
+    camada: estrutura
+    pergunta: Quais rotas da Quest API exigem login?
+    deve_conter:
+      - os grupos attempts, game, user-answers e assessments inteiros
+      - items/next, auth/consent/{id}/withdraw, review/due e me/stats
+      - research/export exige também papel de pesquisador, e admin/items papel de conteúdo
+    fontes:
+      - phishing-quest-api/adapter/http/router/attempt_router.go:16
+      - phishing-quest-api/adapter/http/router/game_router.go:14
+      - phishing-quest-api/adapter/http/router/item_review_router.go:19
+      - phishing-quest-api/adapter/http/router/research_export_router.go:13
+
+  - id: t16
+    publico: tecnico
+    camada: estrutura
+    pergunta: Como o segredo do JWT da Quest API é configurado?
+    deve_conter:
+      - vem da variável JWT_SECRET
+      - existe um valor padrão inseguro, só para desenvolvimento, que precisa ser trocado em produção
+    nao_pode_conter:
+      - o valor literal do segredo padrão
+    fontes: [phishing-quest-api/core/service/jwt_service.go]
+
+  - id: t17
+    publico: tecnico
+    camada: estrutura
+    pergunta: Como o console do pesquisador exporta dados e o que é incluir_pii?
+    deve_conter:
+      - GET /api/v1/researcher/rodadas/{rodada_id}/export com dataset e formato
+      - incluir_pii=true inclui dados pessoais; sem ele o export sai sem PII
+    fontes:
+      - phishforge-api/app/api/v1/endpoints/researcher.py:247
+      - phishforge-frontend/src/services/researcherApiService.ts:63
+
+  - id: t18
+    publico: tecnico
+    camada: experiencia
+    pergunta: Que issues motivaram a separação da autenticação nos roteadores da phishforge-api?
+    deve_conter:
+      - issue 7 (chave servidor-a-servidor em todo o roteador de geração)
+      - issue 36 (JWT do especialista) e issue 38 (chave do pesquisador)
+    fontes:
+      - phishforge-api/app/api/router.py:7
+      - phishforge-api/app/api/router.py:13
+      - phishforge-api/app/api/router.py:20
+
+  - id: t19
+    publico: tecnico
+    camada: estrutura
+    pergunta: Como a phishing-quest-api gera rascunhos de item hoje?
+    deve_conter:
+      - por templates locais por canal (TemplateDraftService), sem chamada de rede
+      - o rascunho é gravado com source "llm_draft" mesmo vindo de template
+      - a geração via PhishForge está prevista, mas não implementada
+    fontes:
+      - phishing-quest-api/core/service/item_draft_service.go:32
+      - phishing-quest-api/core/service/item_draft_service.go:67
+
+  - id: t20
+    publico: tecnico
+    camada: experiencia
+    pergunta: Qual é a estratégia de testes de integração e CI da Quest API?
+    deve_conter:
+      - workflow novo de CI em PR, sem mexer no existente
+      - testes atrás da build tag integration, subindo o app real
+      - migrations aplicadas pelo Flyway no CI e dados de referência preservados entre testes
+    fontes: [phishing-quest-api/docs/decisoes/0002-estrategia-testes-e-ci.md:20]
