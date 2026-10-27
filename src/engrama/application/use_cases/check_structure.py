@@ -3,7 +3,8 @@ from engrama.application.ports.graph import GroundTruthSource, StructureReader
 
 
 class CheckStructureAgainstGroundTruth:
-    """Portao 1: o grafo gravado tem exatamente as rotas e chamadas conferidas a mao."""
+    """Portao 1: o grafo gravado tem exatamente as rotas, chamadas e bancos
+    conferidos a mao."""
 
     def __init__(self, reader: StructureReader, ground_truth: GroundTruthSource) -> None:
         self._reader = reader
@@ -13,6 +14,7 @@ class CheckStructureAgainstGroundTruth:
         expected = self._ground_truth.load()
         routes = set(self._reader.routes())
         calls = set(self._reader.calls())
+        datastores = set(self._reader.datastores())
         return StructureCheckReport(
             expected_routes=len(expected.routes),
             expected_calls=len(expected.calls),
@@ -20,4 +22,7 @@ class CheckStructureAgainstGroundTruth:
             unexpected_routes=tuple(sorted(routes - expected.routes)),
             missing_calls=tuple(sorted(expected.calls - calls)),
             unexpected_calls=tuple(sorted(calls - expected.calls)),
+            expected_datastores=len(expected.datastores),
+            missing_datastores=tuple(sorted(expected.datastores - datastores)),
+            unexpected_datastores=tuple(sorted(datastores - expected.datastores)),
         )

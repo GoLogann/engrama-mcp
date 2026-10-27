@@ -19,15 +19,25 @@ UNWIND $rows AS row
 MATCH (s:{source} {{key: row.source}})
 MATCH (t:{target} {{key: row.target}})
 MERGE (s)-[r:{kind} {{open: true}}]->(t)
-ON CREATE SET r.valid_from = row.valid_from
+ON CREATE SET r.valid_from = row.valid_from, r.ingested_at = row.ingested_at
 SET r += row.props
 """
+# `valid_from` e `ingested_at` so entram na criacao: dizem quando o fato passou
+# a valer e quando o grafo soube dele, e reingerir o mesmo fato nao muda isso.
+
 # Fato de extracao que nao apareceu nesta rodada deixou de valer: ganha
 # `valid_to` e fecha, mas continua no grafo (modelo bitemporal).
 _RETIRE_STALE = """
 MATCH ()-[r]->()
 WHERE r.owner = $owner AND r.source = 'extraction' AND r.open AND r.run_id <> $run_id
 SET r.open = false, r.valid_to = $at
+"""
+# A CALLS pertence ao cliente. Numa reingestao so da API, a rota pode sumir sem
+# o cliente ser regravado: a chamada fica sem destino e tambem deixa de valer.
+_CLOSE_ORPHAN_CALLS = """
+MATCH ()-[c:CALLS {open: true}]->(e:Endpoint)
+WHERE NOT EXISTS { MATCH ()-[:EXPOSES {open: true}]->(e) }
+SET c.open = false, c.valid_to = $at
 """
 
 
@@ -69,6 +79,7 @@ class Neo4jGraphWriter(GraphWriter):
                         "source": edge.source.key,
                         "target": edge.target.key,
                         "valid_from": edge.validity.valid_from,
+                        "ingested_at": edge.validity.ingested_at,
                         "props": edge_properties(edge, owner, run_id),
                     }
                 )
@@ -78,3 +89,4 @@ class Neo4jGraphWriter(GraphWriter):
 
         for owner in graphs:
             tx.run(_RETIRE_STALE, owner=owner, run_id=run_id, at=at).consume()
+        tx.run(_CLOSE_ORPHAN_CALLS, at=at).consume()

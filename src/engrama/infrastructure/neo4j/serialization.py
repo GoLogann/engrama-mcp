@@ -43,7 +43,6 @@ def edge_properties(edge: Edge, owner: str, run_id: str) -> dict[str, Any]:
         "confidence": edge.provenance.confidence.value,
         "evidence": [str(e) for e in edge.provenance.evidence],
         "evidence_json": evidence_json(edge.provenance.evidence),
-        "ingested_at": edge.validity.ingested_at,
         "owner": owner,
         "run_id": run_id,
     }

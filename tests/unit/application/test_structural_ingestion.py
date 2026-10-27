@@ -1,5 +1,5 @@
 from engrama.application.dto.ingestion import Catalog, RepositorySpec
-from engrama.application.dto.structure_check import CallFact, GroundTruth, RouteFact
+from engrama.application.dto.structure_check import CallFact, DataStoreFact, GroundTruth, RouteFact
 from engrama.application.ports.graph import GroundTruthSource
 from engrama.application.use_cases.build_structural_graph import BuildStructuralGraph
 from engrama.application.use_cases.check_structure import CheckStructureAgainstGroundTruth
@@ -7,6 +7,8 @@ from engrama.application.use_cases.ingest_repository import IngestRepository
 from engrama.application.use_cases.link_calls_to_routes import LinkCallsToRoutes
 from engrama.domain.entities import EdgeKind, Project, Repo, Stack
 from engrama.domain.services import RouteNormalizer, StructuralGraphBuilder
+from engrama.domain.value_objects import Evidence, Validity
+from engrama.domain.value_objects.code_facts import DataStoreUse
 from engrama.infrastructure.extractors import FastApiExtractor, ReactServiceExtractor
 from tests.fakes.graph import InMemoryGraph
 from tests.fakes.sources import COMMITTED_AT, FixedClock, InMemorySourceRepository, StaticCatalog
@@ -119,3 +121,40 @@ def test_conferencia_aponta_o_que_falta_e_o_que_sobra():
     assert [r.route for r in report.missing_routes] == ["POST /api/v1/generate"]
     assert [r.route for r in report.unexpected_routes] == ["GET /api/v1/cues"]
     assert report.call_coverage == 1.0
+
+
+def test_conferencia_de_bancos_aponta_o_que_falta_e_o_que_sobra():
+    graph = InMemoryGraph()
+    store = DataStoreUse(
+        "forge-api",
+        "qdrant",
+        "phishing_articles",
+        (Evidence.in_code("forge-api", "docker-compose.yml", C, 26),),
+    )
+    validity = Validity.starting(COMMITTED_AT)
+    graph.write(
+        {
+            "forge-api": StructuralGraphBuilder().repository(
+                Project("forge", "Forge"), API, [], [], [store], [], validity
+            )
+        },
+        run_id="r1",
+        at=COMMITTED_AT,
+    )
+    expected = GroundTruth(
+        routes=frozenset(),
+        calls=frozenset(),
+        datastores=frozenset(
+            {
+                DataStoreFact("forge-api", "qdrant", "phishing_articles"),
+                DataStoreFact("forge-api", "postgres", "forge"),
+            }
+        ),
+    )
+
+    report = CheckStructureAgainstGroundTruth(graph, StaticGroundTruth(expected)).execute()
+
+    assert [d.name for d in report.missing_datastores] == ["forge"]
+    assert report.unexpected_datastores == ()
+    assert report.datastore_coverage == 0.5
+    assert not report.passed

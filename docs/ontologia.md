@@ -12,7 +12,7 @@ Cada nó tem uma chave natural única, gravada na propriedade `key` (constraints
 | `Repo` | Estrutura | `nome` | `phishforge-api` |
 | `Module` | Estrutura | `repo:caminho` | `phishforge-api:app/domain/services` |
 | `Endpoint` | Estrutura | `repo:MÉTODO caminho` | `phishing-quest-api:GET /api/v1/rankings` |
-| `DataStore` | Estrutura | `repo:tipo:nome` | `phishforge-api:qdrant:phishing_articles` |
+| `DataStore` | Estrutura | `repo:tipo:nome` (no Qdrant, o nome é a coleção) | `phishforge-api:qdrant:phishing_articles` |
 | `Concept` | Documentação | `slug` | `pista` (alias `cue`) |
 | `Doc` | Documentação | `repo:caminho` | `phishforge-api:docs/integracao_api.md` |
 | `Decision` | Documentação | `repo:caminho` | `phishing-quest-api:docs/decisoes/0001-path-registro-usuario.md` |
@@ -50,7 +50,7 @@ As quatro arestas estruturais só vêm da extração determinística (princípio
 | `source` | arestas e episódios | `extraction`, `document`, `llm` ou `person` |
 | `evidence` | arestas e episódios | repo, arquivo, linha e commit, ou o link do documento. Só `person` pode ficar sem evidência externa: o episódio, com autor e data, é a evidência |
 | `confidence` | arestas e episódios | `high` só para extração (obrigatório) e pessoa; `llm` nunca chega a `high` |
-| `valid_from`, `valid_to`, `ingested_at` | arestas e episódios | datas com fuso; `valid_to` nulo = vale hoje; nada é apagado, o que deixa de valer ganha `valid_to` |
+| `valid_from`, `valid_to`, `ingested_at` | arestas e episódios | datas com fuso; `valid_to` nulo = vale hoje; nada é apagado, o que deixa de valer ganha `valid_to`. `valid_from` e `ingested_at` são gravados uma vez, quando o fato é visto pela primeira vez, e reingerir não os muda |
 | `author` | episódios | um `Person`, via `AUTHORED_BY` |
 
 ## Episódios

@@ -1,6 +1,10 @@
 from typer.testing import CliRunner
 
-from engrama.application.dto.structure_check import RouteFact, StructureCheckReport
+from engrama.application.dto.structure_check import (
+    DataStoreFact,
+    RouteFact,
+    StructureCheckReport,
+)
 from engrama.bootstrap.container import Container
 from engrama.entrypoints.cli.app import build_cli
 
@@ -58,3 +62,22 @@ def test_check_structure_aprova():
 
     assert result.exit_code == 0
     assert "Portão 1: aprovado" in result.stdout
+
+
+def test_check_structure_mostra_bancos_faltando():
+    report = StructureCheckReport(
+        0,
+        0,
+        (),
+        (),
+        (),
+        (),
+        expected_datastores=2,
+        missing_datastores=(DataStoreFact("api", "qdrant", "phishing_articles"),),
+    )
+
+    result = CliRunner().invoke(cli(report), ["check-structure"])
+
+    assert result.exit_code == 1
+    assert "Bancos: 50% de 2" in result.stdout
+    assert "Bancos faltando (1)" in result.stdout

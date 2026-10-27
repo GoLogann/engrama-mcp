@@ -72,13 +72,16 @@ def _print_ingestion(report: IngestionReport) -> None:
 def _print_check(report: StructureCheckReport) -> None:
     typer.echo(
         f"Rotas: {report.route_coverage:.0%} de {report.expected_routes} | "
-        f"Chamadas: {report.call_coverage:.0%} de {report.expected_calls}"
+        f"Chamadas: {report.call_coverage:.0%} de {report.expected_calls} | "
+        f"Bancos: {report.datastore_coverage:.0%} de {report.expected_datastores}"
     )
     sections = (
         ("Rotas faltando", report.missing_routes),
         ("Rotas a mais", report.unexpected_routes),
         ("Chamadas faltando", report.missing_calls),
         ("Chamadas a mais", report.unexpected_calls),
+        ("Bancos faltando", report.missing_datastores),
+        ("Bancos a mais", report.unexpected_datastores),
     )
     for title, facts in sections:
         if facts:

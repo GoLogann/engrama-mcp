@@ -50,7 +50,7 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 
 ## Extração da camada de estrutura
 
-`engrama ingest` roda o caso de uso `BuildStructuralGraph`: leva cada repo ao commit do catálogo, aplica os extratores que valem para ele, casa as chamadas com as rotas de todos os repos e grava tudo no Neo4j numa transação. `engrama check-structure` confere o grafo gravado com `eval/structure_groundtruth.yaml` (Portão 1).
+`engrama ingest` roda o caso de uso `BuildStructuralGraph`: leva cada repo ao commit do catálogo, aplica os extratores que valem para ele, casa as chamadas com as rotas de todos os repos e grava tudo no Neo4j numa transação. `engrama check-structure` confere o grafo gravado com `eval/structure_groundtruth.yaml` (Portão 1: rotas, chamadas e bancos).
 
 | Extrator | Stack | O que lê |
 | --- | --- | --- |
@@ -58,17 +58,20 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 | `GinExtractor` | Go | `grupo.GET("/caminho", handler)`, com prefixos de `router.Group(...)` encadeados |
 | `ReactServiceExtractor` | TypeScript | chamadas a `request`/`requestBlob`, resolvendo constantes, template strings e ternários; `method` do segundo argumento, padrão GET |
 | `FlutterExtractor` | Dart | `buildUrl(url: ...)` em `lib/`, com o método da chamada HTTP que usa a mesma variável |
-| `ComposeExtractor` | todas | bancos no compose da raiz: Postgres com `POSTGRES_DB`, Qdrant, Redis; migrations Flyway como evidência |
+| `ComposeExtractor` | todas | bancos no compose da raiz: Postgres com `POSTGRES_DB`, Qdrant, Redis; migrations Flyway como evidência. Para o Qdrant, o nome é a coleção lida do `COLLECTION_NAME` do código (a linha vira a 2ª evidência); sem ela, vale o nome do serviço e sai um diagnóstico |
 | `IssueReferenceExtractor` | todas | `issue #7`, `issues #12 e #13` e `<repo-do-catálogo> #5` em código |
 
 O que a extração não deduz do código fica declarado em `config/repos.yaml`, com a evidência: qual API cada cliente consome (`consumes`) e o caminho base das chamadas (`base_path`). As duas coisas vêm de variável de ambiente nos repos.
 
-Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo.
+Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
+
+Uma `CALLS` pertence ao repo cliente. Se só a API for reingerida e perder a rota, a chamada fica sem destino e também é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
 
 Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 - `include_router(..., prefix=...)` no FastAPI e `Any`/`Handle` no Gin não são extraídos. Nenhum dos quatro repos os usa hoje.
 - `issue #N` sempre aponta para o repo do arquivo. No frontend, "issue #7 do backend" vira a issue #7 do frontend.
+- Se a rota que sumiu voltar numa reingestão só da API, a chamada do cliente continua fechada até o cliente ser reingerido. `engrama ingest` sem `--repo` refaz tudo.
 - Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
 
 ## Como estender
