@@ -65,13 +65,13 @@ O que a extração não deduz do código fica declarado em `config/repos.yaml`, 
 
 Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
 
-Uma `CALLS` pertence ao repo cliente. Se só a API for reingerida e perder a rota, a chamada fica sem destino e também é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
+Uma `CALLS` pertence ao repo cliente, e só existe se cliente e servidor entram na mesma rodada. Por isso `engrama ingest --repo X` traz também os clientes de X (as rotas deles podem ter mudado) e todos os servidores de cada repo que entrou (`Catalog.with_related`); a CLI lista o que entrou por relação. Se a rota some do servidor, a chamada do cliente fica sem destino e é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
 
 Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 - `include_router(..., prefix=...)` no FastAPI e `Any`/`Handle` no Gin não são extraídos. Nenhum dos quatro repos os usa hoje.
 - `issue #N` sempre aponta para o repo do arquivo. No frontend, "issue #7 do backend" vira a issue #7 do frontend.
-- Se a rota que sumiu voltar numa reingestão só da API, a chamada do cliente continua fechada até o cliente ser reingerido. `engrama ingest` sem `--repo` refaz tudo.
+- A relação entre repos vem de `consumes` em `config/repos.yaml`. Um repo que faz chamadas e não declara `consumes` não é relacionado a ninguém numa ingestão parcial; `engrama ingest` sem `--repo` sempre refaz tudo.
 - Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
 
 ## Como estender
