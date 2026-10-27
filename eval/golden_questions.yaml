@@ -69,7 +69,7 @@ perguntas:
       - a recomendação foi manter o RAG pela fundamentação, consistência e rastreabilidade
       - sem RAG pode existir como modo rápido para demos e testes
     fontes:
-      - phishforge-api/docs/analise_rag_vs_no_rag.md:34
+      - phishforge-api/docs/analise_rag_vs_no_rag.md:39
       - phishforge-api/docs/analise_rag_vs_no_rag.md:238
 
   - id: n06
@@ -81,7 +81,7 @@ perguntas:
       - fidelidade ao contexto cerca de 4 vezes maior (0,137 contra 0,033)
       - relevância das respostas praticamente igual; CoT foi cerca de 8% mais rápido
     fontes:
-      - phishforge-api/docs/analise_zero_shot_vs_cot.md:27
+      - phishforge-api/docs/analise_zero_shot_vs_cot.md:30
       - phishforge-api/docs/analise_zero_shot_vs_cot.md:189
 
   - id: n07
@@ -103,7 +103,8 @@ perguntas:
       - hoje a geração está restrita a e-mail
       - existem outros 5 canais no modelo (SMS, WhatsApp, site, ligação, Pix QR), ainda inalcançáveis pelas rotas
     fontes:
-      - phishforge-api/app/domain/models/channel.py:23
+      - phishforge-api/app/domain/models/channel.py:15
+      - phishforge-api/app/domain/models/channel.py:27
 
   - id: n09
     publico: nao_tecnico
@@ -311,6 +312,8 @@ perguntas:
       - em desenvolvimento a base vem de VITE_API_BASE_URL (padrão localhost:8000)
     fontes:
       - phishforge-frontend/nginx.conf.template:14
+      - phishforge-frontend/nginx.conf.template:26
+      - phishforge-frontend/nginx.conf.template:40
       - phishforge-frontend/src/services/http.ts:2
 
   - id: t09
@@ -322,6 +325,8 @@ perguntas:
     fontes:
       - phishforge-api/app/domain/services/generation_pipeline.py
       - phishforge-api/app/domain/services/response_generator.py
+      - phishforge-api/app/domain/services/prompt_normalizer.py
+      - phishforge-api/app/domain/services/reranker.py
 
   - id: t10
     publico: tecnico
@@ -376,6 +381,7 @@ perguntas:
     fontes:
       - phishing_quest/lib/app/data/repositories/game/game_repository.dart:21
       - phishing-quest-api/adapter/http/router/game_router.go:14
+      - phishing-quest-api/adapter/http/router/game_router.go:16
 
   - id: t15
     publico: tecnico
@@ -390,6 +396,12 @@ perguntas:
       - phishing-quest-api/adapter/http/router/game_router.go:14
       - phishing-quest-api/adapter/http/router/item_review_router.go:19
       - phishing-quest-api/adapter/http/router/research_export_router.go:13
+      - phishing-quest-api/adapter/http/router/user_answer_router.go:13
+      - phishing-quest-api/adapter/http/router/assessment_router.go:12
+      - phishing-quest-api/adapter/http/router/item_router.go:25
+      - phishing-quest-api/adapter/http/router/attempt_router.go:13
+      - phishing-quest-api/adapter/http/router/review_schedule_router.go:11
+      - phishing-quest-api/adapter/http/router/user_stats_router.go:11
 
   - id: t16
     publico: tecnico
@@ -400,7 +412,9 @@ perguntas:
       - existe um valor padrão inseguro, só para desenvolvimento, que precisa ser trocado em produção
     nao_pode_conter:
       - o valor literal do segredo padrão
-    fontes: [phishing-quest-api/core/service/jwt_service.go]
+    fontes:
+      - phishing-quest-api/core/service/jwt_service.go:37
+      - phishing-quest-api/core/service/jwt_service.go:39
 
   - id: t17
     publico: tecnico
