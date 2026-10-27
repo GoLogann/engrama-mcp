@@ -6,6 +6,7 @@ from pathlib import Path
 from engrama.application.ports.sources import SourceRepository, SourceTree
 from engrama.application.ports.system import SecretScanner
 from engrama.domain.entities import Repo
+from engrama.domain.errors import ExcludedSourcePath
 
 
 def _git(*args: str, cwd: Path | None = None) -> str:
@@ -22,6 +23,7 @@ class LocalSourceTree(SourceTree):
         self._root = root
         self._scanner = scanner
         self._tracked = sorted(_git("ls-files", cwd=root).splitlines())
+        self._tracked_set = frozenset(self._tracked)
 
     @property
     def committed_at(self) -> datetime:
@@ -39,6 +41,10 @@ class LocalSourceTree(SourceTree):
             yield path
 
     def read(self, path: str) -> str:
+        if self._scanner.excludes(path):
+            raise ExcludedSourcePath(f"{path} e excluido pela politica de segredos")
+        if path not in self._tracked_set:
+            raise FileNotFoundError(path)
         return (self._root / path).read_text(encoding="utf-8", errors="replace")
 
 
