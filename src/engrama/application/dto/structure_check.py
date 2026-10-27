@@ -23,10 +23,20 @@ class CallFact:
     target: str
 
 
+@dataclass(frozen=True, slots=True, order=True)
+class DataStoreFact:
+    """Banco que um repo usa. Para o Qdrant, `name` e a colecao."""
+
+    repo: str
+    kind: str
+    name: str
+
+
 @dataclass(frozen=True, slots=True)
 class GroundTruth:
     routes: frozenset[RouteFact]
     calls: frozenset[CallFact]
+    datastores: frozenset[DataStoreFact] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +47,9 @@ class StructureCheckReport:
     unexpected_routes: tuple[RouteFact, ...]
     missing_calls: tuple[CallFact, ...]
     unexpected_calls: tuple[CallFact, ...]
+    expected_datastores: int = 0
+    missing_datastores: tuple[DataStoreFact, ...] = ()
+    unexpected_datastores: tuple[DataStoreFact, ...] = ()
 
     @property
     def passed(self) -> bool:
@@ -45,6 +58,8 @@ class StructureCheckReport:
             or self.unexpected_routes
             or self.missing_calls
             or self.unexpected_calls
+            or self.missing_datastores
+            or self.unexpected_datastores
         )
 
     @property
@@ -54,3 +69,8 @@ class StructureCheckReport:
     @property
     def call_coverage(self) -> float:
         return 1 - len(self.missing_calls) / self.expected_calls if self.expected_calls else 1.0
+
+    @property
+    def datastore_coverage(self) -> float:
+        missing = len(self.missing_datastores)
+        return 1 - missing / self.expected_datastores if self.expected_datastores else 1.0

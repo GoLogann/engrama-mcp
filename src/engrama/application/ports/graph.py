@@ -2,7 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
 
-from engrama.application.dto.structure_check import CallFact, GroundTruth, RouteFact
+from engrama.application.dto.structure_check import (
+    CallFact,
+    DataStoreFact,
+    GroundTruth,
+    RouteFact,
+)
 from engrama.domain.services import StructuralGraph
 
 
@@ -20,13 +25,16 @@ class GraphWriter(ABC):
 
 
 class StructureReader(ABC):
-    """Leitura das rotas e chamadas gravadas, para conferir com o groundtruth."""
+    """Leitura das rotas, chamadas e bancos gravados, para conferir com o groundtruth."""
 
     @abstractmethod
     def routes(self) -> list[RouteFact]: ...
 
     @abstractmethod
     def calls(self) -> list[CallFact]: ...
+
+    @abstractmethod
+    def datastores(self) -> list[DataStoreFact]: ...
 
 
 class GroundTruthSource(ABC):

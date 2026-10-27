@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
-from engrama.application.dto.structure_check import CallFact, RouteFact
+from engrama.application.dto.structure_check import CallFact, DataStoreFact, RouteFact
 from engrama.application.ports.graph import GraphWriter, StructureReader
-from engrama.domain.entities import Edge, EdgeKind, Endpoint, Node
+from engrama.domain.entities import DataStore, Edge, EdgeKind, Endpoint, Node
 from engrama.domain.services import StructuralGraph
 
 
@@ -39,10 +39,17 @@ class InMemoryGraph(GraphWriter, StructureReader):
                 if current is None:
                     self.edges.append(StoredEdge(edge, owner, run_id))
                 else:
-                    current.edge, current.owner, current.run_id = edge, owner, run_id
+                    # Como no Neo4j: valid_from e ingested_at so valem na criacao.
+                    first = current.edge.validity
+                    validity = replace(
+                        edge.validity, valid_from=first.valid_from, ingested_at=first.ingested_at
+                    )
+                    current.edge = replace(edge, validity=validity)
+                    current.owner, current.run_id = owner, run_id
         for stored in self.edges:
             if stored.owner in graphs and stored.open and stored.run_id != run_id:
                 stored.open, stored.valid_to = False, at
+        self._close_orphan_calls(at)
 
     def routes(self) -> list[RouteFact]:
         return [
@@ -62,8 +69,22 @@ class InMemoryGraph(GraphWriter, StructureReader):
                     )
         return facts
 
+    def datastores(self) -> list[DataStoreFact]:
+        facts = []
+        for stored in self.open_edges(EdgeKind.STORES_IN):
+            store = self.nodes[(stored.edge.target.kind.value, stored.edge.target.key)]
+            assert isinstance(store, DataStore)
+            facts.append(DataStoreFact(store.repo, store.store_kind.value, store.name))
+        return facts
+
     def open_edges(self, kind: EdgeKind) -> list[StoredEdge]:
         return [s for s in self.edges if s.open and s.edge.kind is kind]
+
+    def _close_orphan_calls(self, at: datetime) -> None:
+        exposed = {s.edge.target for s in self.open_edges(EdgeKind.EXPOSES)}
+        for stored in self.open_edges(EdgeKind.CALLS):
+            if stored.edge.target not in exposed:
+                stored.open, stored.valid_to = False, at
 
     def _open(self, edge: Edge) -> StoredEdge | None:
         return next(

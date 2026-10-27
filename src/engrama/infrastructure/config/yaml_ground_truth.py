@@ -2,7 +2,12 @@ from pathlib import Path
 
 import yaml
 
-from engrama.application.dto.structure_check import CallFact, GroundTruth, RouteFact
+from engrama.application.dto.structure_check import (
+    CallFact,
+    DataStoreFact,
+    GroundTruth,
+    RouteFact,
+)
 from engrama.application.ports.graph import GroundTruthSource
 from engrama.domain.value_objects import HttpMethod, HttpRoute
 
@@ -34,4 +39,8 @@ class YamlGroundTruthSource(GroundTruthSource):
             for item in items
             for target in consumes[repo]
         )
-        return GroundTruth(routes=routes, calls=calls)
+        datastores = frozenset(
+            DataStoreFact(item["repo"], item["kind"], item["name"])
+            for item in data.get("datastores", ())
+        )
+        return GroundTruth(routes=routes, calls=calls, datastores=datastores)

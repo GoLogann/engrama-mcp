@@ -159,6 +159,16 @@ calls:
     lib/app/data/repositories/login/login_repository.dart:  # path na constante da linha 5
       - {line: 12, route: "POST /api/v1/users/login"}
 
+# Bancos que cada repo declara no compose da raiz. No Qdrant, o nome e a colecao
+# do `COLLECTION_NAME` do codigo, nao o nome do servico. Os outros dois repos
+# (phishforge-frontend e phishing_quest) nao tem compose nem banco.
+# O servico `phishforge-export` usa a imagem do Postgres so como cliente (pg_dump),
+# sem POSTGRES_DB, e por isso nao conta como banco.
+datastores:
+  - {repo: phishforge-api, kind: postgres, name: phishforge}  # docker-compose.yml:2 (POSTGRES_DB, linha 7)
+  - {repo: phishforge-api, kind: qdrant, name: phishing_articles}  # docker-compose.yml:26 + app/core/config.py:19
+  - {repo: phishing-quest-api, kind: postgres, name: phishing_quest}  # docker-compose.yml:3 (POSTGRES_DB, linha 7)
+
 # O que o grafo precisa revelar a partir das listas acima.
 expected_findings:
   every_call_matches_an_endpoint: true   # as 33 chamadas casam com uma rota

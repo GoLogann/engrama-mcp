@@ -2,7 +2,7 @@ import json
 
 from neo4j import Driver
 
-from engrama.application.dto.structure_check import CallFact, RouteFact
+from engrama.application.dto.structure_check import CallFact, DataStoreFact, RouteFact
 from engrama.application.ports.graph import StructureReader
 from engrama.domain.value_objects import HttpMethod, HttpRoute
 
@@ -14,6 +14,12 @@ _CALLS = """
 MATCH (m:Module)-[r:CALLS {open: true}]->(e:Endpoint)
 RETURN m.repo AS caller, e.repo AS target, e.method AS method, e.path AS path,
        r.evidence_json AS evidence
+"""
+
+
+_DATASTORES = """
+MATCH (:Repo)-[:STORES_IN {open: true}]->(d:DataStore)
+RETURN d.repo AS repo, d.store_kind AS kind, d.name AS name
 """
 
 
@@ -29,6 +35,10 @@ class Neo4jStructureReader(StructureReader):
             for row in records
             for evidence in json.loads(row["evidence"])
         ]
+
+    def datastores(self) -> list[DataStoreFact]:
+        records, _, _ = self._driver.execute_query(_DATASTORES, database_=self._database)
+        return [DataStoreFact(row["repo"], row["kind"], row["name"]) for row in records]
 
     def calls(self) -> list[CallFact]:
         """Uma CALLS carrega a evidencia dos dois lados; os pontos de chamada
