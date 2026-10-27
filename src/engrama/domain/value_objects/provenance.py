@@ -64,7 +64,9 @@ class Provenance:
 
     Extracao deterministica e a unica origem com confianca alta; o que o LLM
     infere nunca chega a alta. So pessoas podem afirmar algo sem evidencia
-    externa, porque o proprio episodio, com autor e data, e a evidencia.
+    externa, e so quando a afirmacao e um Episodio: o proprio episodio, com
+    autor e data, e a evidencia. Uma aresta fora de um Episodio exige evidencia
+    de qualquer forma (ver `Edge`).
     """
 
     source: Source
@@ -72,6 +74,14 @@ class Provenance:
     evidence: tuple[Evidence, ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.source, Source) or not isinstance(self.confidence, Confidence):
+            raise InvalidProvenance("origem e confianca precisam ser Source e Confidence")
+        # Normaliza para tupla (lista nao e hashavel) e recusa o que nao e Evidence:
+        # a evidencia e o que torna a afirmacao conferivel, entao nao pode ser um texto solto.
+        evidence = tuple(self.evidence)
+        if not all(isinstance(item, Evidence) for item in evidence):
+            raise InvalidProvenance("evidencia precisa ser Evidence")
+        object.__setattr__(self, "evidence", evidence)
         if self.source is not Source.PERSON and not self.evidence:
             raise InvalidProvenance(f"origem {self.source} exige ao menos uma evidencia")
         if self.source is Source.EXTRACTION and self.confidence is not Confidence.HIGH:

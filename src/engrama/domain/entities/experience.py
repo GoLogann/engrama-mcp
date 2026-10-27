@@ -6,7 +6,7 @@ from typing import ClassVar
 from engrama.domain.entities.edge import Edge, EdgeKind
 from engrama.domain.entities.node import Node
 from engrama.domain.errors import EpisodeAlreadySuperseded, InvalidEpisode
-from engrama.domain.value_objects import NodeKind, NodeRef, Provenance, Validity
+from engrama.domain.value_objects import NodeKind, NodeRef, Provenance, Source, Validity
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -61,6 +61,10 @@ class Episode(Node):
             raise InvalidEpisode(f"autor precisa ser uma pessoa, nao {self.author.kind}")
         if self.supersedes == self.id:
             raise InvalidEpisode("episodio nao substitui a si mesmo")
+        if self.provenance.source not in (Source.PERSON, Source.DOCUMENT):
+            raise InvalidEpisode(
+                f"origem {self.provenance.source} nao cria episodio: so pessoa ou documento"
+            )
 
     @property
     def key(self) -> str:

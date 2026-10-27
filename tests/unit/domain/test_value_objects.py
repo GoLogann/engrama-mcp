@@ -126,3 +126,25 @@ class TestHttpRoute:
 def test_node_ref_rejeita_chave_vazia():
     with pytest.raises(InvalidNode):
         NodeRef(NodeKind.REPO, "  ")
+
+
+class TestProvenanceRecusaEvidenciaQueNaoEEvidencia:
+    @pytest.mark.parametrize("evidence", [(None,), ("texto qualquer",), (42,)])
+    def test_itens_precisam_ser_evidence(self, evidence):
+        with pytest.raises(InvalidProvenance):
+            Provenance(Source.EXTRACTION, Confidence.HIGH, evidence)
+
+    def test_origem_e_confianca_precisam_ser_os_enums(self):
+        proof = Evidence.in_code("r", "a.go", COMMIT, 1)
+        with pytest.raises(InvalidProvenance):
+            Provenance("extraction", Confidence.HIGH, (proof,))
+        with pytest.raises(InvalidProvenance):
+            Provenance(Source.EXTRACTION, "high", (proof,))
+
+    def test_lista_vira_tupla_e_a_proveniencia_continua_hashavel(self):
+        proof = Evidence.in_code("r", "a.go", COMMIT, 1)
+
+        provenance = Provenance(Source.EXTRACTION, Confidence.HIGH, [proof])
+
+        assert provenance.evidence == (proof,)
+        assert hash(provenance) == hash(Provenance.extracted(proof))

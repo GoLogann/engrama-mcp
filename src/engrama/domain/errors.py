@@ -30,5 +30,9 @@ class InvalidEpisode(DomainError):
     pass
 
 
+class UnknownRepository(DomainError):
+    """O nome pedido nao esta no catalogo (config/repos.yaml)."""
+
+
 class EpisodeAlreadySuperseded(DomainError):
     """Um episodio encerrado nao pode ser substituido de novo: o historico e linear."""
