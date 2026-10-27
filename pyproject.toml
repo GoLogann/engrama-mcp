@@ -1,0 +1,62 @@
+[project]
+name = "engrama-mcp"
+version = "0.1.0"
+description = "Cérebro de conhecimento em grafo dos projetos do LABit-UFPA, servido por MCP"
+authors = [{ name = "Logan Cardoso", email = "logan.cc@outlook.com" }]
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = ["typer (>=0.27.3,<0.28.0)", "pydantic-settings (>=2.16.1,<3.0.0)", "dependency-injector (>=4.49.1,<5.0.0)", "pyyaml (>=6.0.3,<7.0.0)"]
+
+[project.scripts]
+engrama = "engrama.bootstrap.main:main"
+
+[tool.poetry]
+packages = [{ include = "engrama", from = "src" }]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["integration: precisa do Neo4j do docker compose"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.importlinter]
+root_package = "engrama"
+include_external_packages = true
+
+# Regra de dependencia da Clean Architecture: cada camada so importa as de
+# baixo. entrypoints e infrastructure sao irmas independentes: um handler MCP
+# nunca conhece o adapter do Neo4j, so o caso de uso que o bootstrap injeta.
+[[tool.importlinter.contracts]]
+name = "Camadas da Clean Architecture"
+type = "layers"
+layers = [
+    "engrama.bootstrap",
+    "engrama.entrypoints | engrama.infrastructure",
+    "engrama.application",
+    "engrama.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Dominio e aplicacao sem frameworks"
+type = "forbidden"
+source_modules = ["engrama.domain", "engrama.application"]
+forbidden_modules = ["pydantic", "pydantic_settings", "dependency_injector", "typer", "yaml"]
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.1.1,<10.0.0)",
+    "pytest-asyncio (>=1.4.1,<2.0.0)",
+    "ruff (>=0.17.3,<0.18.0)",
+    "import-linter (>=2.15,<3.0)"
+]

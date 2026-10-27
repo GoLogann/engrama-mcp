@@ -1,0 +1,26 @@
+# Repositorios ingeridos pela PoC, fixados nos commits lidos em 27/10/2026.
+# Mudar um commit aqui e reingerir e o caminho para atualizar o grafo.
+repos:
+  - name: phishforge-api
+    project: PhishForge
+    url: https://github.com/LABit-UFPA/phishforge-api.git
+    commit: 815bd3a5aef00b7d2d126bc508ddbf6567654c00
+    stack: python-fastapi
+
+  - name: phishforge-frontend
+    project: PhishForge
+    url: https://github.com/LABit-UFPA/phishforge-frontend.git
+    commit: 73b7b835aa0a12adccaa1ed1e8a3e53b7b979b94
+    stack: typescript-react
+
+  - name: phishing-quest-api
+    project: Phishing Quest
+    url: https://github.com/LABit-UFPA/phishing-quest-api.git
+    commit: 1141d440d8d66f0554f5c9e4d2329560f5591b09
+    stack: go-gin
+
+  - name: phishing_quest
+    project: Phishing Quest
+    url: https://github.com/LABit-UFPA/phishing_quest.git
+    commit: 43ed8ffd82eec304af1cff34f60ff523dc4edfa2
+    stack: dart-flutter
