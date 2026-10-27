@@ -1,26 +1,40 @@
 # Repositorios ingeridos pela PoC, fixados nos commits lidos em 27/10/2026.
 # Mudar um commit aqui e reingerir e o caminho para atualizar o grafo.
+#
+# `consumes` e `base_path` nao saem do codigo de forma deterministica: a
+# base URL de cada cliente vem do ambiente. Por isso ficam declarados aqui,
+# com a evidencia de onde foram tirados.
+
+projects:
+  - slug: phishforge
+    name: PhishForge
+  - slug: phishing-quest
+    name: Phishing Quest
+
 repos:
   - name: phishforge-api
-    project: PhishForge
-    url: https://github.com/LABit-UFPA/phishforge-api.git
+    project: phishforge
+    url: https://github.com/LABit-UFPA/phishforge-api
     commit: 815bd3a5aef00b7d2d126bc508ddbf6567654c00
     stack: python-fastapi
 
   - name: phishforge-frontend
-    project: PhishForge
-    url: https://github.com/LABit-UFPA/phishforge-frontend.git
+    project: phishforge
+    url: https://github.com/LABit-UFPA/phishforge-frontend
     commit: 73b7b835aa0a12adccaa1ed1e8a3e53b7b979b94
     stack: typescript-react
+    consumes: [phishforge-api]  # VITE_API_BASE_URL, padrao localhost:8000 (src/services/http.ts:2)
 
   - name: phishing-quest-api
-    project: Phishing Quest
-    url: https://github.com/LABit-UFPA/phishing-quest-api.git
+    project: phishing-quest
+    url: https://github.com/LABit-UFPA/phishing-quest-api
     commit: 1141d440d8d66f0554f5c9e4d2329560f5591b09
     stack: go-gin
 
   - name: phishing_quest
-    project: Phishing Quest
-    url: https://github.com/LABit-UFPA/phishing_quest.git
+    project: phishing-quest
+    url: https://github.com/LABit-UFPA/phishing_quest
     commit: 43ed8ffd82eec304af1cff34f60ff523dc4edfa2
     stack: dart-flutter
+    consumes: [phishing-quest-api]
+    base_path: /api/v1  # as duas bases de lib/app/data/constants/environments.dart terminam em /api/v1
