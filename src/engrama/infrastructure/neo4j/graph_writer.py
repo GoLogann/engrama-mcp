@@ -34,6 +34,8 @@ SET r.open = false, r.valid_to = $at
 """
 # A CALLS pertence ao cliente. Numa reingestao so da API, a rota pode sumir sem
 # o cliente ser regravado: a chamada fica sem destino e tambem deixa de valer.
+# A consulta vale para o banco inteiro, nao so para os donos desta rodada, porque
+# o ponto e justamente pegar a chamada de um dono que nao foi regravado.
 _CLOSE_ORPHAN_CALLS = """
 MATCH ()-[c:CALLS {open: true}]->(e:Endpoint)
 WHERE NOT EXISTS { MATCH ()-[:EXPOSES {open: true}]->(e) }

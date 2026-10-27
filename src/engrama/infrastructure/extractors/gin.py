@@ -65,12 +65,15 @@ class GinExtractor(TreeSitterExtractor):
         if path is None:
             file.warn(call, "rota sem caminho literal")
             return
+        route = self._canonical_route(file, call, method, prefixes[receiver], path)
+        if route is None:
+            return
         arguments = call.child_by_field_name("arguments").named_children
         file.routes.append(
             DeclaredRoute(
                 repo=file.repo,
                 module=file.module,
-                route=self._normalizer.route(method, prefixes[receiver], path),
+                route=route,
                 evidence=file.evidence(call),
                 handler=file.text(arguments[-1]) if len(arguments) > 1 else None,
             )

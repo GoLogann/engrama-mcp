@@ -10,8 +10,9 @@ from tree_sitter_language_pack import get_parser
 from engrama.application.dto.ingestion import CodeFacts, RepositorySpec
 from engrama.application.ports.sources import CodeExtractor, SourceTree
 from engrama.domain.entities import Stack
+from engrama.domain.errors import InvalidRoute
 from engrama.domain.services import ROOT_MODULE, RouteNormalizer
-from engrama.domain.value_objects import Evidence
+from engrama.domain.value_objects import Evidence, HttpRoute
 from engrama.domain.value_objects.code_facts import CallSite, DeclaredRoute
 
 TEST_DIRS = frozenset({"test", "tests", "__tests__", "testdata"})
@@ -108,6 +109,18 @@ class TreeSitterExtractor(CodeExtractor):
 
     def _in_scope(self, path: str) -> bool:
         return True
+
+    def _canonical_route(
+        self, file: ParsedFile, node: SyntaxNode, method: str, *parts: str
+    ) -> HttpRoute | None:
+        """Rota na forma canonica, ou `None` com um diagnostico. Um caminho que o
+        normalizador nao aceita (curinga `*filepath` do Gin, `$id.json` do Dart) nao
+        pode derrubar a extracao do repo inteiro."""
+        try:
+            return self._normalizer.route(method, *parts)
+        except InvalidRoute as error:
+            file.warn(node, f"{error}; ignorada")
+            return None
 
     @abstractmethod
     def _extract_file(self, file: ParsedFile) -> None:

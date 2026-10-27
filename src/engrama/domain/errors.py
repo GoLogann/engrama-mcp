@@ -30,5 +30,13 @@ class InvalidEpisode(DomainError):
     pass
 
 
+class ExcludedSourcePath(DomainError):
+    """A politica de segredos (docs/seguranca.md) proibe ler este arquivo."""
+
+
+class UnknownRepository(DomainError):
+    """O nome pedido nao esta no catalogo (config/repos.yaml)."""
+
+
 class EpisodeAlreadySuperseded(DomainError):
     """Um episodio encerrado nao pode ser substituido de novo: o historico e linear."""

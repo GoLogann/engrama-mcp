@@ -1,3 +1,5 @@
+import pytest
+
 from engrama.application.dto.ingestion import Catalog, RepositorySpec
 from engrama.application.dto.structure_check import CallFact, DataStoreFact, GroundTruth, RouteFact
 from engrama.application.ports.graph import GroundTruthSource
@@ -6,6 +8,7 @@ from engrama.application.use_cases.check_structure import CheckStructureAgainstG
 from engrama.application.use_cases.ingest_repository import IngestRepository
 from engrama.application.use_cases.link_calls_to_routes import LinkCallsToRoutes
 from engrama.domain.entities import EdgeKind, Project, Repo, Stack
+from engrama.domain.errors import UnknownRepository
 from engrama.domain.services import RouteNormalizer, StructuralGraphBuilder
 from engrama.domain.value_objects import Evidence, Validity
 from engrama.domain.value_objects.code_facts import DataStoreUse
@@ -37,12 +40,13 @@ def make(
     graph: InMemoryGraph,
     clock: FixedClock | None = None,
     sources: InMemorySourceRepository | None = None,
+    catalog: Catalog = CATALOG,
 ) -> BuildStructuralGraph:
     normalizer = RouteNormalizer()
     builder = StructuralGraphBuilder()
     extractors = [FastApiExtractor(normalizer), ReactServiceExtractor(normalizer)]
     return BuildStructuralGraph(
-        catalog=StaticCatalog(CATALOG),
+        catalog=StaticCatalog(catalog),
         ingest=IngestRepository(sources or InMemorySourceRepository(trees), extractors),
         link=LinkCallsToRoutes(builder),
         builder=builder,
@@ -85,13 +89,42 @@ def test_rota_removida_deixa_de_valer_na_reingestao():
     assert [(s.edge.kind, s.valid_to) for s in closed] == [(EdgeKind.EXPOSES, later.moment)]
 
 
-def test_ingestao_parcial_so_toca_os_repos_pedidos():
+def test_ingestao_parcial_do_cliente_mantem_as_chamadas_abertas():
+    graph = InMemoryGraph()
+    trees = {"forge-api": API_FILES, "forge-front": FRONT_FILES}
+    make(trees, graph).execute()
+
+    later = FixedClock()
+    later.moment = later.moment.replace(day=29)
+    report = make(trees, graph, later).execute(only=["forge-front"])
+
+    assert len(graph.calls()) == 1
+    assert [s for s in graph.edges if not s.open] == []
+    assert report.related == ("forge-api",)
+
+
+def test_ingestao_parcial_so_toca_os_repos_relacionados():
+    docs = RepositorySpec(Repo("forge-docs", "forge", "https://x/forge-docs", C, Stack.GO_GIN))
+    catalog = Catalog(CATALOG.projects, (*CATALOG.repos, docs))
     trees = {"forge-api": API_FILES, "forge-front": FRONT_FILES}
     sources = InMemorySourceRepository(trees)
 
-    make(trees, InMemoryGraph(), sources=sources).execute(only=["forge-api"])
+    report = make(trees, InMemoryGraph(), sources=sources, catalog=catalog).execute(
+        only=["forge-api"]
+    )
 
-    assert sources.checked_out == ["forge-api"]
+    assert sources.checked_out == ["forge-api", "forge-front"]
+    assert report.related == ("forge-front",)
+
+
+def test_repo_desconhecido_e_recusado_antes_de_ler_qualquer_coisa():
+    trees = {"forge-api": API_FILES}
+    sources = InMemorySourceRepository(trees)
+
+    with pytest.raises(UnknownRepository):
+        make(trees, InMemoryGraph(), sources=sources).execute(only=["forge-apii"])
+
+    assert sources.checked_out == []
 
 
 class StaticGroundTruth(GroundTruthSource):

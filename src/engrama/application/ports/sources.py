@@ -28,7 +28,10 @@ class SourceTree(ABC):
         """Caminhos relativos a raiz, em ordem, com uma das extensoes."""
 
     @abstractmethod
-    def read(self, path: str) -> str: ...
+    def read(self, path: str) -> str:
+        """Conteudo de um arquivo da arvore. A politica de segredos vale aqui como em
+        `files()`: um caminho excluido levanta `ExcludedSourcePath`, e um caminho que
+        nao e da arvore (inclusive `../` e absoluto) levanta `FileNotFoundError`."""
 
 
 class SourceRepository(ABC):

@@ -17,9 +17,9 @@ C = "c" * 40
 N = RouteNormalizer()
 
 
-def run(extractor, stack: Stack, files: dict[str, str], name="repo", base_path=""):
+def run(extractor, stack: Stack, files: dict[str, str], name="repo", base_path="", consumes=()):
     repo = Repo(name, "p", f"https://x/{name}", C, stack)
-    spec = RepositorySpec(repo, base_path=base_path)
+    spec = RepositorySpec(repo, consumes=tuple(consumes), base_path=base_path)
     assert extractor.supports(spec)
     return extractor.extract(
         InMemorySourceTree(repo, {k: dedent(v) for k, v in files.items()}), spec
@@ -276,3 +276,101 @@ def test_issues_do_proprio_repo_e_de_outro_repo_do_catalogo():
         ("quest-api", 12, 3),
         ("quest-api", 13, 3),
     ]
+
+
+def issues(facts):
+    return [(i.issue_repo, i.number, i.evidence.line) for i in facts.issues]
+
+
+def test_issue_do_backend_resolve_pelo_consumes_do_cliente():
+    facts = run(
+        IssueReferenceExtractor(["forge-api", "forge-front"]),
+        Stack.TYPESCRIPT_REACT,
+        {
+            "src/types.ts": """\
+                /** Formato real de links (issue #5 do backend): sempre objeto. */
+                // Chave servidor-a-servidor exigida em toda rota (issue #7
+                // do backend). Variavel VITE_* vai para o bundle.
+            """
+        },
+        name="forge-front",
+        consumes=("forge-api",),
+    )
+
+    assert issues(facts) == [("forge-api", 5, 1), ("forge-api", 7, 2)]
+    assert facts.diagnostics == ()
+
+
+def test_issue_cujo_repo_vem_na_linha_de_comentario_seguinte():
+    facts = run(
+        IssueReferenceExtractor(["quest-api", "quest-app"]),
+        Stack.DART_FLUTTER,
+        {
+            "lib/register.dart": """\
+                // O backend ainda nao emite token no cadastro (ver issue #10 do
+                // repo quest-api). Ate que exista um token real, vai ao login.
+            """
+        },
+        name="quest-app",
+        consumes=("quest-api",),
+    )
+
+    assert issues(facts) == [("quest-api", 10, 1)]
+
+
+def test_issue_do_backend_sem_como_resolver_nao_vira_citacao():
+    facts = run(
+        IssueReferenceExtractor(["a", "b", "app"]),
+        Stack.DART_FLUTTER,
+        {"lib/x.dart": "// ver issue #3 do backend\n"},
+        name="app",
+        consumes=("a", "b"),
+    )
+
+    assert facts.issues == ()
+    assert "do backend" in facts.diagnostics[0]
+    assert "app/lib/x.dart:1" in facts.diagnostics[0]
+
+
+def test_qualificador_so_vale_quando_vem_logo_depois_da_citacao():
+    facts = run(
+        IssueReferenceExtractor(["forge-api", "forge-front"]),
+        Stack.TYPESCRIPT_REACT,
+        {
+            "src/a.ts": """\
+                // ver issue #3 do modulo de avaliacao
+                // ver issue #4
+                const backend = 1
+                // ver issue #5
+                // o backend responde
+            """
+        },
+        name="forge-front",
+        consumes=("forge-api",),
+    )
+
+    assert issues(facts) == [
+        ("forge-front", 3, 1),
+        ("forge-front", 4, 2),
+        ("forge-front", 5, 4),
+    ]
+
+
+def test_caminho_fora_da_forma_canonica_vira_diagnostico_e_nao_derruba_a_extracao():
+    facts = run(
+        GinExtractor(N),
+        Stack.GO_GIN,
+        {
+            "router/r.go": """\
+                package router
+
+                func Setup(router *gin.Engine, h *handler.H) {
+                \trouter.GET("/files/*filepath", h.Static)
+                \trouter.GET("/health", h.Health)
+                }
+            """
+        },
+    )
+
+    assert routes(facts) == [("GET /health", "router/r.go", 5)]
+    assert "/files/*filepath" in facts.diagnostics[0]

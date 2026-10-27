@@ -16,13 +16,17 @@ _EXCLUDED_SUFFIXES = {
 _RAW_REPORT = re.compile(r"_\d{8}_\d{6}\.json$")
 
 _SENSITIVE_KEY = (
-    r"[A-Za-z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_KEY|CREDENTIAL)[A-Za-z0-9_]*"
+    r"[A-Za-z0-9_]*(?:PASSWORD|PASSWD|PASSPHRASE|SECRET|SALT|TOKEN|API_?KEY|PRIVATE_KEY|CREDENTIAL)"
+    r"[A-Za-z0-9_]*"
 )
 _KEY_VALUE = re.compile(
     rf"(?i)\b(?P<key>{_SENSITIVE_KEY})(?P<sep>\s*(?::=|[:=])\s*)"
     r"""(?:"(?P<dq>[^"]*)"|'(?P<sq>[^']*)'|(?P<bare>[^\s"'#,;)]+))"""
 )
 _URL_CREDENTIALS = re.compile(r"(?P<prefix>\b[a-z][a-z0-9+.-]*://[^/\s:@]+:)[^@\s/]+(?=@)")
+# `${VAR:-padrao}`, `${VAR-padrao}` e `${VAR:=padrao}`: a variavel e uma referencia,
+# mas o padrao que o compose embute e um valor de verdade e vai para o repositorio.
+_ENV_DEFAULT = re.compile(r"^\$\{(?P<name>\w+)(?P<op>:?[-=])(?P<default>[^$}][^}]*)\}$")
 # Valores que sao referencias ou nomes de tipo, nao segredos: `${VAR:-}`,
 # `$VAR`, `settings.DB_PASSWORD`, `password: str`.
 _NOT_A_VALUE = re.compile(
@@ -67,11 +71,15 @@ class RegexSecretScanner(SecretScanner):
 
         def mask_value(match: re.Match[str]) -> str:
             value = match.group("dq") or match.group("sq") or match.group("bare") or ""
+            quote = '"' if match.group("dq") is not None else "'" if match.group("sq") else ""
+            head = f"{match.group('key')}{match.group('sep')}{quote}"
+            if default := _ENV_DEFAULT.match(value):
+                rules.append("env-default")
+                return f"{head}${{{default['name']}{default['op']}{REDACTED}}}{quote}"
             if not value or _NOT_A_VALUE.search(value):
                 return match.group(0)
             rules.append("key-value")
-            quote = '"' if match.group("dq") is not None else "'" if match.group("sq") else ""
-            return f"{match.group('key')}{match.group('sep')}{quote}{REDACTED}{quote}"
+            return f"{head}{REDACTED}{quote}"
 
         line = _KEY_VALUE.sub(mask_value, line)
         line, count = _URL_CREDENTIALS.subn(rf"\g<prefix>{REDACTED}", line)

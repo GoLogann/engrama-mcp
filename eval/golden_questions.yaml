@@ -45,6 +45,7 @@ perguntas:
       - phishforge-api/README.md:3
       - phishforge-api/docs/integracao_api.md:37
       - phishforge-api/docs/integracao_api.md:143
+      - phishforge-api/docs/integracao_api.md:144
 
   - id: n04
     publico: nao_tecnico
@@ -122,6 +123,8 @@ perguntas:
       - não; o app mostra dados fictícios (mock)
       - a API já tem a rota de ranking, mas o app não a chama
     fontes:
+      - phishing_quest/lib/app/data/repositories/ranking/ranking_repository.dart:9
+      - phishing_quest/lib/app/data/repositories/ranking/ranking_repository.dart:11
       - phishing_quest/lib/app/modules/ranking/ranking_controller.dart:28
       - phishing-quest-api/adapter/http/router/ranking_router.go:11
 

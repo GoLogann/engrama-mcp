@@ -8,6 +8,7 @@ from engrama.application.dto.ingestion import IngestionReport
 from engrama.application.dto.structure_check import StructureCheckReport
 from engrama.application.use_cases.build_structural_graph import BuildStructuralGraph
 from engrama.application.use_cases.check_structure import CheckStructureAgainstGroundTruth
+from engrama.domain.errors import UnknownRepository
 
 
 def build_cli(
@@ -33,7 +34,12 @@ def build_cli(
         ] = None,
     ) -> None:
         """Extrai os repos do catálogo e grava a camada de estrutura no Neo4j."""
-        _print_ingestion(build_structural_graph().execute(only=repo or ()))
+        try:
+            report = build_structural_graph().execute(only=repo or ())
+        except UnknownRepository as error:
+            typer.echo(f"Erro: {error}", err=True)
+            raise typer.Exit(code=2) from error
+        _print_ingestion(report)
 
     @app.command("check-structure")
     def check_structure_command() -> None:
@@ -47,6 +53,10 @@ def build_cli(
 
 
 def _print_ingestion(report: IngestionReport) -> None:
+    if report.related:
+        typer.echo(
+            f"Incluídos por serem clientes ou servidores dos pedidos: {', '.join(report.related)}\n"
+        )
     for repo in report.repos:
         typer.echo(
             f"{repo.name}@{repo.commit[:7]}: {repo.modules} módulos, {repo.routes} rotas, "

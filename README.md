@@ -43,5 +43,6 @@ poetry run lint-imports       # regra de dependência entre camadas
 - [Fundamentação e plano](docs/fundamentacao.md): a revisão da literatura e as decisões de design.
 - [Arquitetura do código](docs/arquitetura.md): camadas, portas e como estender.
 - [Ontologia do grafo](docs/ontologia.md): nós, arestas e propriedades obrigatórias.
+- [Decisões de arquitetura](docs/decisoes/): por que o código diverge do plano em cada ponto.
 - [Segredos e dados sensíveis](docs/seguranca.md): o que nunca entra no grafo e o que nunca sai dele.
 - [Perguntas de ouro](eval/golden_questions.yaml) e [groundtruth estrutural](eval/structure_groundtruth.yaml): a base da avaliação.

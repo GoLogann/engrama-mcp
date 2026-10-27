@@ -93,6 +93,8 @@ class Edge:
     validity: Validity
 
     def __post_init__(self) -> None:
+        if not isinstance(self.provenance, Provenance) or not isinstance(self.validity, Validity):
+            raise InvalidEdge("aresta exige Provenance e Validity")
         rule = RULES[self.kind]
         if (self.source.kind, self.target.kind) not in rule.pairs:
             raise InvalidEdge(f"{self.kind} nao liga {self.source.kind} a {self.target.kind}")
@@ -100,6 +102,10 @@ class Edge:
             raise InvalidEdge(f"{self.kind} nao pode vir de {self.provenance.source}")
         if self.source == self.target:
             raise InvalidEdge(f"{self.kind} de um no para ele mesmo: {self.source}")
+        if not self.provenance.evidence and self.source.kind is not NodeKind.EPISODE:
+            raise InvalidEdge(
+                f"{self.kind} sem evidencia: so arestas que partem de um Episodio dispensam"
+            )
 
     def __str__(self) -> str:
         return f"{self.source} -[{self.kind}]-> {self.target}"

@@ -15,9 +15,9 @@ bootstrap        raiz de composição: settings, container de DI, main
         domain          entidades, value objects, serviços de domínio
 ```
 
-**Regra de dependência:** uma camada só importa as que estão abaixo dela. `entrypoints` e `infrastructure` são irmãs independentes: um handler MCP recebe o caso de uso pronto e nunca importa o adapter do Neo4j. `domain` e `application` não importam frameworks (Pydantic, dependency-injector, Typer, PyYAML, drivers).
+**Regra de dependência:** uma camada só importa as que estão abaixo dela. `entrypoints` e `infrastructure` são irmãs independentes: um handler MCP recebe o caso de uso pronto e nunca importa o adapter do Neo4j. `domain` e `application` não importam frameworks nem drivers (Pydantic, pydantic-settings, dependency-injector, Typer, PyYAML, o driver do Neo4j, tree-sitter e detect-secrets).
 
-As duas regras são verificadas pelo [import-linter](https://import-linter.readthedocs.io/) (`poetry run lint-imports`), configurado em `pyproject.toml`. Uma violação quebra o build.
+As duas regras são verificadas pelo [import-linter](https://import-linter.readthedocs.io/) (`poetry run lint-imports`), configurado em `pyproject.toml` (decisão em [0002](decisoes/0002-contratos-de-camadas-no-pyproject-e-ci.md)). O CI (`.github/workflows/ci.yml`) roda lint, formatação, `lint-imports` e os testes, com um Neo4j descartável, em Python 3.12 e 3.13. Uma violação quebra o build.
 
 ## Onde cada coisa mora
 
@@ -63,20 +63,21 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 
 O que a extração não deduz do código fica declarado em `config/repos.yaml`, com a evidência: qual API cada cliente consome (`consumes`) e o caminho base das chamadas (`base_path`). As duas coisas vêm de variável de ambiente nos repos.
 
-Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
+Reingerir é idempotente (as regras de vigência estão no [ADR 0009](decisoes/0009-vigencia-das-arestas-e-ingestao-parcial.md)). Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
 
-Uma `CALLS` pertence ao repo cliente. Se só a API for reingerida e perder a rota, a chamada fica sem destino e também é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
+Uma `CALLS` pertence ao repo cliente, e só existe se cliente e servidor entram na mesma rodada. Por isso `engrama ingest --repo X` traz também os clientes de X (as rotas deles podem ter mudado) e todos os servidores de cada repo que entrou (`Catalog.with_related`); a CLI lista o que entrou por relação. Se a rota some do servidor, a chamada do cliente fica sem destino e é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
 
 Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 - `include_router(..., prefix=...)` no FastAPI e `Any`/`Handle` no Gin não são extraídos. Nenhum dos quatro repos os usa hoje.
-- `issue #N` sempre aponta para o repo do arquivo. No frontend, "issue #7 do backend" vira a issue #7 do frontend.
-- Se a rota que sumiu voltar numa reingestão só da API, a chamada do cliente continua fechada até o cliente ser reingerido. `engrama ingest` sem `--repo` refaz tudo.
+- `issue #N` vale para o repo do arquivo, salvo se logo depois (na mesma linha ou na linha de comentário seguinte) vier `do repo <nome>`, `do <nome>` ou `do backend`. Este último resolve pelo `consumes` do repo e só vale quando há exatamente um; com zero ou vários, a citação é ignorada e sai um diagnóstico. Qualquer outra forma de apontar para outro repo continua sendo lida como o repo do arquivo.
+- Um caminho fora da forma canônica (o curinga `*filepath` do Gin, `$id.json` do Dart) vira diagnóstico e só aquela rota é ignorada; a ingestão segue.
+- A relação entre repos vem de `consumes` em `config/repos.yaml`. Um repo que faz chamadas e não declara `consumes` não é relacionado a ninguém numa ingestão parcial; `engrama ingest` sem `--repo` sempre refaz tudo.
 - Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
 
 ## Como estender
 
-**Uma stack nova** (por exemplo, Spring): crie uma subclasse de `TreeSitterExtractor` em `engrama.infrastructure.extractors`, implemente as queries da stack, adicione fixtures em `tests/fixtures/` e registre a classe no `ExtractorRegistry` do container.
+**Uma stack nova** (por exemplo, Spring): crie uma subclasse de `TreeSitterExtractor` em `engrama.infrastructure.extractors`, implemente as queries da stack, adicione trechos de código dela em `tests/unit/infrastructure/test_extractors.py` e acrescente a classe à lista `extractors` do container (`bootstrap/container.py`; decisão em [0003](decisoes/0003-extratores-registrados-no-container.md)).
 
 **Outro provedor de LLM ou de embeddings:** implemente `LLMGateway` ou `Embedder` em `engrama.infrastructure`, rode a suíte de contrato da porta contra ele e troque o provider no container.
 
@@ -84,6 +85,6 @@ Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 | Pasta | O que testa | Precisa de |
 | --- | --- | --- |
-| `tests/unit` | Domínio e casos de uso, com fakes | Nada |
-| `tests/contracts` | Cada porta contra o fake e contra o adapter real | Neo4j para os adapters reais |
-| `tests/integration` | Adapters reais de ponta a ponta | `docker compose up -d neo4j` |
+| `tests/unit` | Domínio, casos de uso (com fakes), extratores (trechos de código dentro do teste), CLI e o formato das perguntas de ouro | Nada |
+| `tests/contracts` | A mesma suíte contra o fake e contra o adapter real: o grafo (Neo4j) e a árvore de fontes (repositório git local) | Neo4j para o grafo; sem ele, os casos `[neo4j]` são pulados |
+| `tests/integration` | O `GitSourceRepository` sobre um repo git local e o filtro de segredos sobre as linhas reais dos clones | git; os clones em `.cache/repos` (criados por `engrama ingest`), e sem eles esses casos são pulados |

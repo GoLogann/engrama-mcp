@@ -38,7 +38,8 @@ class BuildStructuralGraph:
     def execute(self, only: Collection[str] = ()) -> IngestionReport:
         catalog = self._catalog.load()
         now = self._clock.now()
-        specs = [s for s in catalog.repos if not only or s.repo.name in only]
+        names = catalog.with_related(only)
+        specs = [s for s in catalog.repos if s.repo.name in names]
         repositories = [self._ingest.execute(spec) for spec in specs]
 
         graphs: dict[str, StructuralGraph] = {}
@@ -76,4 +77,5 @@ class BuildStructuralGraph:
             ),
             links=links.report,
             diagnostics=tuple(d for r in repositories for d in r.facts.diagnostics),
+            related=tuple(n for n in names if only and n not in only),
         )

@@ -62,8 +62,9 @@ class FlutterExtractor(TreeSitterExtractor):
             if method is None:
                 file.warn(builder, f"nenhuma chamada HTTP usa '{variable}' na mesma funcao")
                 continue
-            route = self._normalizer.route(method, file.spec.base_path, path)
-            file.calls.append(CallSite(file.repo, file.module, route, file.evidence(builder)))
+            route = self._canonical_route(file, builder, method, file.spec.base_path, path)
+            if route is not None:
+                file.calls.append(CallSite(file.repo, file.module, route, file.evidence(builder)))
 
     def _string_constants(self, file: ParsedFile) -> dict[str, str]:
         constants: dict[str, str] = {}

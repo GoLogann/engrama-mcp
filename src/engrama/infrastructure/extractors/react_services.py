@@ -42,7 +42,10 @@ class ReactServiceExtractor(TreeSitterExtractor):
                 file.warn(call, f"caminho nao resolvido: {file.text(arguments[0])[:60]}")
                 continue
             method = self._method(file, arguments[1]) if len(arguments) > 1 else "GET"
-            routes = {self._normalizer.route(method, file.spec.base_path, p) for p in paths}
+            built = (
+                self._canonical_route(file, call, method, file.spec.base_path, p) for p in paths
+            )
+            routes = {route for route in built if route is not None}
             for route in sorted(routes, key=str):
                 file.calls.append(CallSite(file.repo, file.module, route, file.evidence(call)))
 

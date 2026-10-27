@@ -70,14 +70,17 @@ class FastApiExtractor(TreeSitterExtractor):
         if path_node is None:
             file.warn(decorator, "rota sem caminho literal")
             return
+        route = self._canonical_route(
+            file, decorator, method, prefixes[router], self._string(file, path_node)
+        )
+        if route is None:
+            return
         handler = definition.child_by_field_name("definition")
         file.routes.append(
             DeclaredRoute(
                 repo=file.repo,
                 module=file.module,
-                route=self._normalizer.route(
-                    method, prefixes[router], self._string(file, path_node)
-                ),
+                route=route,
                 evidence=file.evidence(decorator),
                 handler=file.text(handler.child_by_field_name("name")) if handler else None,
             )

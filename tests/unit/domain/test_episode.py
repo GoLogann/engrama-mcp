@@ -90,3 +90,10 @@ def test_arestas_do_episodio():
 def test_rejeita_episodio_invalido(overrides):
     with pytest.raises(InvalidEpisode):
         recorded(**overrides)
+
+
+def test_episodio_so_aceita_origem_de_pessoa_ou_documento():
+    inferred = Provenance.inferred(Evidence.in_document("https://example.org/doc"))
+
+    with pytest.raises(InvalidEpisode, match="origem"):
+        recorded(provenance=inferred)

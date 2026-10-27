@@ -48,7 +48,7 @@ As quatro arestas estruturais só vêm da extração determinística (princípio
 | Propriedade | Onde | Regra |
 | --- | --- | --- |
 | `source` | arestas e episódios | `extraction`, `document`, `llm` ou `person` |
-| `evidence` | arestas e episódios | repo, arquivo, linha e commit, ou o link do documento. Só `person` pode ficar sem evidência externa: o episódio, com autor e data, é a evidência |
+| `evidence` | arestas e episódios | repo, arquivo, linha e commit, ou o link do documento. Só as arestas que partem de um `Episode` podem ficar sem evidência externa: o episódio, com autor e data, é a evidência. Qualquer outra aresta exige ao menos uma `Evidence`, e o domínio recusa a que não tiver |
 | `confidence` | arestas e episódios | `high` só para extração (obrigatório) e pessoa; `llm` nunca chega a `high` |
 | `valid_from`, `valid_to`, `ingested_at` | arestas e episódios | datas com fuso; `valid_to` nulo = vale hoje; nada é apagado, o que deixa de valer ganha `valid_to`. `valid_from` e `ingested_at` são gravados uma vez, quando o fato é visto pela primeira vez, e reingerir não os muda |
 | `author` | episódios | um `Person`, via `AUTHORED_BY` |

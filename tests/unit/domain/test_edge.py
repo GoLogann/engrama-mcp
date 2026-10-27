@@ -56,3 +56,43 @@ def test_toda_aresta_tem_regra():
     from engrama.domain.entities.edge import RULES
 
     assert set(RULES) == set(EdgeKind)
+
+
+class TestArestaSemEvidencia:
+    """Principio 3 do plano: toda aresta carrega evidencia. A unica excecao e a
+    aresta que parte de um Episodio, porque o proprio episodio (autor e data) e a prova."""
+
+    PESSOA = Provenance.stated_by_person()
+    ISSUE = NodeRef(NodeKind.ISSUE, "r#1")
+    EPISODIO = NodeRef(NodeKind.EPISODE, "ep-1")
+    PESSOA_NO = NodeRef(NodeKind.PERSON, "GoLogann")
+
+    def test_aresta_de_modulo_afirmada_por_pessoa_sem_evidencia_e_recusada(self):
+        with pytest.raises(InvalidEdge, match="sem evidencia"):
+            Edge(EdgeKind.REFERENCES_ISSUE, APP_MODULE, self.ISSUE, self.PESSOA, VALIDITY)
+
+    def test_mencao_de_conceito_por_pessoa_sem_evidencia_e_recusada(self):
+        with pytest.raises(InvalidEdge, match="sem evidencia"):
+            Edge(EdgeKind.MENTIONS_CONCEPT, APP_MODULE, CONCEPT, self.PESSOA, VALIDITY)
+
+    def test_aresta_que_parte_de_episodio_dispensa_evidencia(self):
+        about = Edge(EdgeKind.ABOUT, self.EPISODIO, APP_MODULE, self.PESSOA, VALIDITY)
+        author = Edge(EdgeKind.AUTHORED_BY, self.EPISODIO, self.PESSOA_NO, self.PESSOA, VALIDITY)
+
+        assert about.provenance.evidence == author.provenance.evidence == ()
+
+    @pytest.mark.parametrize("provenance", [None, "extracao"])
+    def test_proveniencia_precisa_ser_uma_proveniencia(self, provenance):
+        with pytest.raises(InvalidEdge):
+            Edge(EdgeKind.CALLS, APP_MODULE, ANSWER_ENDPOINT, provenance, VALIDITY)
+
+    @pytest.mark.parametrize("validity", [None, "2026-09-17"])
+    def test_validade_precisa_ser_uma_validade(self, validity):
+        with pytest.raises(InvalidEdge):
+            Edge(
+                EdgeKind.CALLS,
+                APP_MODULE,
+                ANSWER_ENDPOINT,
+                Provenance.extracted(CALL_SITE),
+                validity,
+            )
