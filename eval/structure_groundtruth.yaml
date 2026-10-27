@@ -1,0 +1,182 @@
+# Referencia do Portao 1: rotas expostas e chamadas HTTP entre os repos,
+# levantadas e conferidas a mao nos commits de config/repos.yaml (27/10/2026).
+#
+# Rotas na forma canonica (docs/ontologia.md): parametros como {nome}, sem
+# query string. `line` e a linha do decorator (FastAPI), do registro da rota
+# (Gin) ou da chamada que monta a URL (React, Flutter).
+#
+# Fora do escopo: rotas que o framework cria sozinho (/docs, /openapi.json).
+
+endpoints:
+  phishforge-api:  # 30 rotas
+    app/api/v1/endpoints/generator.py:  # sem prefixo; X-API-Key do backend Go
+      - {line: 50, route: "POST /api/v1/generate"}
+      - {line: 178, route: "POST /api/v1/generate/batch"}
+      - {line: 271, route: "GET /api/v1/generate/batch/{job_id}"}
+      - {line: 321, route: "GET /api/v1/cues"}
+      - {line: 335, route: "GET /api/v1/emails/statistics"}
+      - {line: 355, route: "GET /api/v1/emails"}
+      - {line: 386, route: "GET /api/v1/emails/{email_id}"}
+      - {line: 400, route: "DELETE /api/v1/emails/{email_id}"}
+      - {line: 427, route: "POST /api/v1/evaluate/user-answer"}
+    app/api/v1/endpoints/expert.py:  # APIRouter(prefix="/api/v1/expert"), linha 44
+      - {line: 88, route: "POST /api/v1/expert/session"}
+      - {line: 118, route: "GET /api/v1/expert/me"}
+      - {line: 129, route: "GET /api/v1/expert/tcle"}
+      - {line: 139, route: "POST /api/v1/expert/consentimento"}
+      - {line: 165, route: "POST /api/v1/expert/perfil"}
+      - {line: 180, route: "POST /api/v1/expert/revogacao"}
+      - {line: 203, route: "GET /api/v1/expert/cues"}
+      - {line: 221, route: "GET /api/v1/expert/itens/{ordem}"}
+      - {line: 243, route: "PUT /api/v1/expert/itens/{ordem}"}
+    app/api/v1/endpoints/researcher.py:  # APIRouter(prefix="/api/v1/researcher"), linha 44
+      - {line: 69, route: "POST /api/v1/researcher/rodadas"}
+      - {line: 82, route: "GET /api/v1/researcher/rodadas"}
+      - {line: 90, route: "GET /api/v1/researcher/rodadas/{rodada_id}"}
+      - {line: 107, route: "GET /api/v1/researcher/corpus"}
+      - {line: 119, route: "PUT /api/v1/researcher/rodadas/{rodada_id}/itens"}
+      - {line: 154, route: "POST /api/v1/researcher/rodadas/{rodada_id}/abrir"}
+      - {line: 163, route: "POST /api/v1/researcher/rodadas/{rodada_id}/encerrar"}
+      - {line: 172, route: "POST /api/v1/researcher/especialistas"}
+      - {line: 196, route: "POST /api/v1/researcher/especialistas/{especialista_id}/recodificar"}
+      - {line: 216, route: "GET /api/v1/researcher/especialistas"}
+      - {line: 234, route: "GET /api/v1/researcher/rodadas/{rodada_id}/resumo"}
+      - {line: 247, route: "GET /api/v1/researcher/rodadas/{rodada_id}/export"}
+
+  phishing-quest-api:  # 45 rotas, 16 routers registrados em adapter/http/router.go
+    adapter/http/router/item_router.go:
+      - {line: 24, route: "GET /api/v1/items"}
+      - {line: 25, route: "GET /api/v1/items/next"}
+      - {line: 26, route: "GET /api/v1/items/{id}"}
+    adapter/http/router/question_router.go:
+      - {line: 11, route: "POST /api/v1/questions"}
+      - {line: 12, route: "GET /api/v1/questions/{id}"}
+      - {line: 13, route: "PUT /api/v1/questions/{id}"}
+      - {line: 14, route: "DELETE /api/v1/questions/{id}"}
+      - {line: 15, route: "GET /api/v1/questions/{id}/answers"}
+    adapter/http/router/category_router.go:
+      - {line: 11, route: "POST /api/v1/categories"}
+      - {line: 12, route: "GET /api/v1/categories"}
+      - {line: 13, route: "GET /api/v1/categories/{id}/questions"}
+    adapter/http/router/attempt_router.go:
+      - {line: 12, route: "POST /api/v1/auth/consent"}
+      - {line: 13, route: "POST /api/v1/auth/consent/{id}/withdraw"}
+      - {line: 18, route: "POST /api/v1/attempts"}
+      - {line: 19, route: "GET /api/v1/attempts/users/{id}"}
+    adapter/http/router/game_router.go:
+      - {line: 16, route: "POST /api/v1/game/answer"}
+    adapter/http/router/user_router.go:
+      - {line: 13, route: "POST /api/v1/users/register"}
+      - {line: 14, route: "POST /api/v1/users/login"}
+      - {line: 15, route: "GET /api/v1/users/{id}"}
+    adapter/http/router/ranking_router.go:
+      - {line: 11, route: "GET /api/v1/rankings"}
+    adapter/http/router/review_schedule_router.go:
+      - {line: 11, route: "GET /api/v1/review/due"}
+    adapter/http/router/telemetry_router.go:
+      - {line: 9, route: "POST /api/v1/telemetry-events"}
+    adapter/http/router/user_stats_router.go:
+      - {line: 11, route: "GET /api/v1/me/stats"}
+    adapter/http/router/answer_router.go:
+      - {line: 11, route: "POST /api/v1/answers"}
+      - {line: 12, route: "GET /api/v1/answers/{id}"}
+      - {line: 13, route: "PUT /api/v1/answers/{id}"}
+      - {line: 14, route: "DELETE /api/v1/answers/{id}"}
+    adapter/http/router/assessment_router.go:
+      - {line: 14, route: "POST /api/v1/assessments/{phase}"}
+      - {line: 15, route: "GET /api/v1/assessments/{phase}/users/{id}"}
+    adapter/http/router/research_export_router.go:
+      - {line: 13, route: "GET /api/v1/research/export"}
+    adapter/http/router/user_answer_router.go:
+      - {line: 15, route: "POST /api/v1/user-answers"}
+      - {line: 16, route: "GET /api/v1/user-answers"}
+      - {line: 17, route: "GET /api/v1/user-answers/{id}"}
+      - {line: 18, route: "PUT /api/v1/user-answers/{id}"}
+      - {line: 19, route: "DELETE /api/v1/user-answers/{id}"}
+    adapter/http/router/item_review_router.go:
+      - {line: 21, route: "POST /api/v1/admin/items"}
+      - {line: 22, route: "POST /api/v1/admin/items/generate"}
+      - {line: 23, route: "GET /api/v1/admin/items"}
+      - {line: 24, route: "GET /api/v1/admin/items/{id}"}
+      - {line: 25, route: "POST /api/v1/admin/items/{id}/review"}
+      - {line: 26, route: "POST /api/v1/admin/items/{id}/publish"}
+    adapter/http/router/cue_router.go:
+      - {line: 13, route: "GET /api/v1/cues"}
+      - {line: 14, route: "POST /api/v1/cues"}
+      - {line: 17, route: "POST /api/v1/item-cues"}
+      - {line: 18, route: "GET /api/v1/items/{id}/cues"}
+
+# Quem consome quem. Nao sai do codigo de forma deterministica (a base URL vem
+# de variavel de ambiente), entao vira configuracao em config/repos.yaml na
+# fase 1. Importa porque `GET /api/v1/cues` existe nas duas APIs.
+consumes:
+  phishforge-frontend: [phishforge-api]   # VITE_API_BASE_URL, padrao localhost:8000
+  phishing_quest: [phishing-quest-api]    # environments.dart, .../api/v1
+
+calls:
+  phishforge-frontend:  # 27 chamadas, todas para a phishforge-api
+    src/services/apiService.ts:
+      - {line: 15, route: "POST /api/v1/generate"}
+      - {line: 20, route: "POST /api/v1/generate/batch"}
+      - {line: 24, route: "GET /api/v1/generate/batch/{jobId}"}
+      - {line: 29, route: "GET /api/v1/emails/{emailId}"}
+      - {line: 43, route: "GET /api/v1/emails"}
+      - {line: 48, route: "GET /api/v1/emails/statistics"}
+      - {line: 53, route: "DELETE /api/v1/emails/{emailId}"}
+    src/services/expertApiService.ts:
+      - {line: 17, route: "POST /api/v1/expert/session"}
+      - {line: 25, route: "GET /api/v1/expert/me"}
+      - {line: 29, route: "GET /api/v1/expert/tcle"}
+      - {line: 33, route: "POST /api/v1/expert/consentimento"}
+      - {line: 41, route: "POST /api/v1/expert/perfil"}
+      - {line: 45, route: "GET /api/v1/expert/cues"}
+      - {line: 49, route: "GET /api/v1/expert/itens/{ordem}"}
+      - {line: 53, route: "PUT /api/v1/expert/itens/{ordem}"}
+    src/services/researcherApiService.ts:  # const P = '/api/v1/researcher', linha 18
+      - {line: 20, route: "GET /api/v1/researcher/rodadas"}
+      - {line: 23, route: "GET /api/v1/researcher/rodadas/{id}"}
+      - {line: 36, route: "GET /api/v1/researcher/corpus"}
+      - {line: 40, route: "POST /api/v1/researcher/rodadas"}
+      - {line: 43, route: "PUT /api/v1/researcher/rodadas/{id}/itens"}
+      - {line: 46, route: "POST /api/v1/researcher/rodadas/{id}/abrir"}
+      - {line: 49, route: "POST /api/v1/researcher/rodadas/{id}/encerrar"}
+      - {line: 52, route: "POST /api/v1/researcher/especialistas"}
+      - {line: 55, route: "POST /api/v1/researcher/especialistas/{id}/recodificar"}
+      - {line: 58, route: "GET /api/v1/researcher/especialistas"}
+      - {line: 61, route: "GET /api/v1/researcher/rodadas/{id}/resumo"}
+      - {line: 72, route: "GET /api/v1/researcher/rodadas/{id}/export"}
+
+  phishing_quest:  # 6 chamadas, todas para a phishing-quest-api; base termina em /api/v1
+    lib/app/data/repositories/category/category_repository.dart:
+      - {line: 15, route: "GET /api/v1/categories"}
+    lib/app/data/repositories/question/question_repository.dart:
+      - {line: 17, route: "GET /api/v1/categories/{categoryId}/questions"}
+      - {line: 33, route: "GET /api/v1/questions/{questionId}/answers"}
+    lib/app/data/repositories/game/game_repository.dart:
+      - {line: 21, route: "POST /api/v1/game/answer"}
+    lib/app/data/repositories/register/register_repository.dart:  # path na constante da linha 5
+      - {line: 12, route: "POST /api/v1/users/register"}
+    lib/app/data/repositories/login/login_repository.dart:  # path na constante da linha 5
+      - {line: 12, route: "POST /api/v1/users/login"}
+
+# O que o grafo precisa revelar a partir das listas acima.
+expected_findings:
+  every_call_matches_an_endpoint: true   # as 33 chamadas casam com uma rota
+  endpoints_without_client:
+    phishforge-api:
+      - GET /api/v1/cues
+      - POST /api/v1/evaluate/user-answer
+      - POST /api/v1/expert/revogacao
+    phishing-quest-api:
+      count: 39   # 45 rotas - 6 usadas pelo app; inclui GET /api/v1/rankings
+  documented_only_integrations:
+    - from: phishing-quest-api
+      to: phishforge-api
+      evidence:
+        - phishforge-api/docs/integracao_api.md:37    # "o unico cliente legitimo hoje e o backend Go"
+        - phishforge-api/docs/integracao_api.md:143   # integracao via phishing-quest-api #62, que ainda nao existe
+        - phishforge-api/app/api/router.py:11         # require_api_key pensado para o backend Go
+      code: nenhuma chamada HTTP de saida no Go (busca por http.Get/Post/NewRequest e por /api/v1/generate)
+  unused_features:
+    - endpoint: phishing-quest-api:GET /api/v1/rankings
+      evidence: phishing_quest/lib/app/modules/ranking/ranking_controller.dart:28   # MockData.ranking
