@@ -10,7 +10,7 @@ O plano nomeava um `DetectSecretsScanner` e dizia que arquivos `.env*` nunca sã
 ## Decisão
 
 - `RegexSecretScanner` combina regras próprias (chave=valor, padrão de `${VAR:-x}`, `usuário:senha@host`, literais atribuídos a nomes sensíveis) com apenas os detectores de provedor do detect-secrets (AWS, GitHub, chave privada, JWT...).
-- `.env` e `.env.*` nunca são lidos, **exceto** `.env.example`, que documenta quais variáveis existem; o valor de cada chave sensível dele passa pelo mascaramento.
+- `.env` e `.env.*` nunca são lidos, **exceto** `.env.example`, que documenta quais variáveis existem. O valor de cada chave sensível dele é mascarado por `redact` quando o texto for indexado (Fase 2); até lá o arquivo só é liberado para leitura, e nenhum valor dele chega ao grafo.
 - `read()` de uma árvore de fontes recusa o que a política exclui, não só `files()`.
 
 ## Alternativas consideradas

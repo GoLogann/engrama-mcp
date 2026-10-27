@@ -63,7 +63,7 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 
 O que a extração não deduz do código fica declarado em `config/repos.yaml`, com a evidência: qual API cada cliente consome (`consumes`) e o caminho base das chamadas (`base_path`). As duas coisas vêm de variável de ambiente nos repos.
 
-Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
+Reingerir é idempotente (as regras de vigência estão no [ADR 0009](decisoes/0009-vigencia-das-arestas-e-ingestao-parcial.md)). Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo. `valid_from` e `ingested_at` valem a primeira vez que o fato foi visto e não mudam nas reingestões seguintes.
 
 Uma `CALLS` pertence ao repo cliente, e só existe se cliente e servidor entram na mesma rodada. Por isso `engrama ingest --repo X` traz também os clientes de X (as rotas deles podem ter mudado) e todos os servidores de cada repo que entrou (`Catalog.with_related`); a CLI lista o que entrou por relação. Se a rota some do servidor, a chamada do cliente fica sem destino e é fechada. Nós nunca são removidos nem fechados, só as arestas: um endpoint que sumiu continua como nó sem `EXPOSES` aberta, então toda consulta parte das arestas abertas.
 
