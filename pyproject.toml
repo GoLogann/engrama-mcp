@@ -51,7 +51,17 @@ layers = [
 name = "Dominio e aplicacao sem frameworks"
 type = "forbidden"
 source_modules = ["engrama.domain", "engrama.application"]
-forbidden_modules = ["pydantic", "pydantic_settings", "dependency_injector", "typer", "yaml"]
+forbidden_modules = [
+    "pydantic",
+    "pydantic_settings",
+    "dependency_injector",
+    "typer",
+    "yaml",
+    "neo4j",
+    "tree_sitter",
+    "tree_sitter_language_pack",
+    "detect_secrets",
+]
 
 [dependency-groups]
 dev = [

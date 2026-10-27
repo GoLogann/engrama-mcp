@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  qualidade:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    # Neo4j descartavel so para esta execucao: os testes de contrato gravam nele.
+    # A senha existe apenas dentro do container do job e nao protege nada.
+    services:
+      neo4j:
+        image: neo4j:5.26-community
+        env:
+          NEO4J_AUTH: neo4j/senha-so-do-ci
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p senha-so-do-ci 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 12
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: senha-so-do-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Instalar Poetry e as dependencias
+        run: |
+          pipx install poetry
+          poetry env use python
+          poetry install
+
+      - name: Lint
+        run: poetry run ruff check .
+
+      - name: Formatacao
+        run: poetry run ruff format --check .
+
+      - name: Contratos de camadas
+        run: poetry run lint-imports
+
+      # Os testes que dependem dos clones em .cache/repos (fontes das perguntas de
+      # ouro, filtro de segredos sobre os repos reais) sao pulados aqui.
+      - name: Testes
+        run: poetry run pytest -q -rs
