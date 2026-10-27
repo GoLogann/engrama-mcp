@@ -22,3 +22,6 @@ class Settings(BaseSettings):
     repos_config: Path = Field(
         default=Path("config/repos.yaml"), validation_alias="ENGRAMA_REPOS_CONFIG"
     )
+    ground_truth_path: Path = Field(
+        default=Path("eval/structure_groundtruth.yaml"), validation_alias="ENGRAMA_GROUND_TRUTH"
+    )

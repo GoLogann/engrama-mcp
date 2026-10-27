@@ -1,6 +1,6 @@
 # Segredos e dados sensíveis
 
-O engrama lê código e documentação, nunca bancos de dados, e nunca devolve uma credencial numa resposta. Isso é garantido em duas camadas: um filtro na ingestão (`SecretScanner`) e um sanitizador em toda saída do MCP (`OutputSanitizer`). As regras abaixo foram definidas na fase 0 e são implementadas na fase 1.
+O engrama lê código e documentação, nunca bancos de dados, e nunca devolve uma credencial numa resposta. Isso é garantido em duas camadas: um filtro na ingestão (`SecretScanner`, implementado em `RegexSecretScanner`) e um sanitizador em toda saída do MCP (fase 4). As credenciais da tabela abaixo são casos de teste do filtro (`tests/unit/infrastructure/test_secret_scanner.py`), com valores falsos.
 
 ## Regras da ingestão
 
@@ -8,7 +8,7 @@ O engrama lê código e documentação, nunca bancos de dados, e nunca devolve u
 2. **Valores mascarados, chaves mantidas:** em YAML, `.env.example`, compose, workflows de CI e blocos de código em Markdown, o valor de toda chave que case com `PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|PRIVATE_KEY|CREDENTIAL` vira `<redacted>`. A chave continua no grafo, porque saber que existe `JWT_SECRET` é conhecimento útil; o valor não.
 3. **Strings de conexão:** `password=...` dentro de strings de conexão e `usuario:senha@host` em URLs são mascarados.
 4. **Literais no código:** um literal atribuído a uma variável cujo nome contém `secret`, `password`, `token` ou `key` é mascarado (é o caso do padrão de desenvolvimento do JWT na Quest API).
-5. **Varredura genérica:** todo texto ingerido passa pelo [detect-secrets](https://github.com/Yelp/detect-secrets) (entropia e padrões de provedores como AWS, OpenAI, Anthropic e GitHub). Um achado é mascarado e registrado no log da ingestão, com arquivo e linha.
+5. **Padrões de provedor:** todo texto ingerido passa pelos detectores de provedor do [detect-secrets](https://github.com/Yelp/detect-secrets) (AWS, GitHub, chaves privadas, JWT, entre outros). Um achado é mascarado e registrado com a linha. Os detectores de entropia ficaram de fora: chamados linha a linha, eles não aplicam limiar e marcam até nomes como `passwordController`. A regra 2 cobre o caso comum de segredo em configuração.
 
 ## Regras da saída
 
@@ -17,7 +17,7 @@ O engrama lê código e documentação, nunca bancos de dados, e nunca devolve u
 
 ## Onde há segredos nos repos da PoC
 
-Levantado nos commits fixados em `config/repos.yaml`. São credenciais de desenvolvimento, já públicas nos repos, mas o engrama não as repete. Esta lista vira teste de regressão do filtro na fase 1.
+Levantado nos commits fixados em `config/repos.yaml`. São credenciais de desenvolvimento, já públicas nos repos, mas o engrama não as repete.
 
 | Arquivo | Linha | Chave |
 | --- | --- | --- |
