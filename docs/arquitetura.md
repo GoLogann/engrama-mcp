@@ -15,9 +15,9 @@ bootstrap        raiz de composição: settings, container de DI, main
         domain          entidades, value objects, serviços de domínio
 ```
 
-**Regra de dependência:** uma camada só importa as que estão abaixo dela. `entrypoints` e `infrastructure` são irmãs independentes: um handler MCP recebe o caso de uso pronto e nunca importa o adapter do Neo4j. `domain` e `application` não importam frameworks (Pydantic, dependency-injector, Typer, PyYAML, drivers).
+**Regra de dependência:** uma camada só importa as que estão abaixo dela. `entrypoints` e `infrastructure` são irmãs independentes: um handler MCP recebe o caso de uso pronto e nunca importa o adapter do Neo4j. `domain` e `application` não importam frameworks nem drivers (Pydantic, pydantic-settings, dependency-injector, Typer, PyYAML, o driver do Neo4j, tree-sitter e detect-secrets).
 
-As duas regras são verificadas pelo [import-linter](https://import-linter.readthedocs.io/) (`poetry run lint-imports`), configurado em `pyproject.toml`. Uma violação quebra o build.
+As duas regras são verificadas pelo [import-linter](https://import-linter.readthedocs.io/) (`poetry run lint-imports`), configurado em `pyproject.toml` (decisão em [0002](decisoes/0002-contratos-de-camadas-no-pyproject-e-ci.md)). O CI (`.github/workflows/ci.yml`) roda lint, formatação, `lint-imports` e os testes, com um Neo4j descartável, em Python 3.12 e 3.13. Uma violação quebra o build.
 
 ## Onde cada coisa mora
 
@@ -77,7 +77,7 @@ Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 ## Como estender
 
-**Uma stack nova** (por exemplo, Spring): crie uma subclasse de `TreeSitterExtractor` em `engrama.infrastructure.extractors`, implemente as queries da stack, adicione fixtures em `tests/fixtures/` e registre a classe no `ExtractorRegistry` do container.
+**Uma stack nova** (por exemplo, Spring): crie uma subclasse de `TreeSitterExtractor` em `engrama.infrastructure.extractors`, implemente as queries da stack, adicione trechos de código dela em `tests/unit/infrastructure/test_extractors.py` e acrescente a classe à lista `extractors` do container (`bootstrap/container.py`; decisão em [0003](decisoes/0003-extratores-registrados-no-container.md)).
 
 **Outro provedor de LLM ou de embeddings:** implemente `LLMGateway` ou `Embedder` em `engrama.infrastructure`, rode a suíte de contrato da porta contra ele e troque o provider no container.
 
@@ -85,6 +85,6 @@ Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 | Pasta | O que testa | Precisa de |
 | --- | --- | --- |
-| `tests/unit` | Domínio e casos de uso, com fakes | Nada |
-| `tests/contracts` | Cada porta contra o fake e contra o adapter real | Neo4j para os adapters reais |
-| `tests/integration` | Adapters reais de ponta a ponta | `docker compose up -d neo4j` |
+| `tests/unit` | Domínio, casos de uso (com fakes), extratores (trechos de código dentro do teste), CLI e o formato das perguntas de ouro | Nada |
+| `tests/contracts` | A mesma suíte contra o fake e contra o adapter real: o grafo (Neo4j) e a árvore de fontes (repositório git local) | Neo4j para o grafo; sem ele, os casos `[neo4j]` são pulados |
+| `tests/integration` | O `GitSourceRepository` sobre um repo git local e o filtro de segredos sobre as linhas reais dos clones | git; os clones em `.cache/repos` (criados por `engrama ingest`), e sem eles esses casos são pulados |
