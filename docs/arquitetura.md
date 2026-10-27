@@ -48,6 +48,29 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 | Segregação de interfaces | `GraphReader` separado de `GraphWriter`; `EpisodeRepository` só acrescenta, sem update nem delete |
 | Inversão de dependência | Casos de uso recebem portas no construtor; só o `Container` conhece classes concretas |
 
+## Extração da camada de estrutura
+
+`engrama ingest` roda o caso de uso `BuildStructuralGraph`: leva cada repo ao commit do catálogo, aplica os extratores que valem para ele, casa as chamadas com as rotas de todos os repos e grava tudo no Neo4j numa transação. `engrama check-structure` confere o grafo gravado com `eval/structure_groundtruth.yaml` (Portão 1).
+
+| Extrator | Stack | O que lê |
+| --- | --- | --- |
+| `FastApiExtractor` | Python | `@router.<método>("/caminho")` + `APIRouter(prefix=...)` do mesmo arquivo |
+| `GinExtractor` | Go | `grupo.GET("/caminho", handler)`, com prefixos de `router.Group(...)` encadeados |
+| `ReactServiceExtractor` | TypeScript | chamadas a `request`/`requestBlob`, resolvendo constantes, template strings e ternários; `method` do segundo argumento, padrão GET |
+| `FlutterExtractor` | Dart | `buildUrl(url: ...)` em `lib/`, com o método da chamada HTTP que usa a mesma variável |
+| `ComposeExtractor` | todas | bancos no compose da raiz: Postgres com `POSTGRES_DB`, Qdrant, Redis; migrations Flyway como evidência |
+| `IssueReferenceExtractor` | todas | `issue #7`, `issues #12 e #13` e `<repo-do-catálogo> #5` em código |
+
+O que a extração não deduz do código fica declarado em `config/repos.yaml`, com a evidência: qual API cada cliente consome (`consumes`) e o caminho base das chamadas (`base_path`). As duas coisas vêm de variável de ambiente nos repos.
+
+Reingerir é idempotente. Uma aresta de extração que não aparece numa rodada nova ganha `valid_to` e deixa de ser lida, mas continua no grafo.
+
+Limitações conhecidas, registradas como diagnóstico quando aparecem:
+
+- `include_router(..., prefix=...)` no FastAPI e `Any`/`Handle` no Gin não são extraídos. Nenhum dos quatro repos os usa hoje.
+- `issue #N` sempre aponta para o repo do arquivo. No frontend, "issue #7 do backend" vira a issue #7 do frontend.
+- Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
+
 ## Como estender
 
 **Uma stack nova** (por exemplo, Spring): crie uma subclasse de `TreeSitterExtractor` em `engrama.infrastructure.extractors`, implemente as queries da stack, adicione fixtures em `tests/fixtures/` e registre a classe no `ExtractorRegistry` do container.

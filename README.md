@@ -21,16 +21,19 @@ PoC em andamento. Fases e portões de qualidade em [docs/fundamentacao.md](docs/
 Requisitos: Python 3.12 ou 3.13, [Poetry](https://python-poetry.org/) 2.x e Docker.
 
 ```bash
-cp .env.example .env          # defina NEO4J_PASSWORD
+cp .env.example .env              # defina NEO4J_PASSWORD
 poetry install
 docker compose up -d neo4j
-poetry run engrama --help
+poetry run engrama ingest         # clona os 4 repos em .cache/ e grava a estrutura no Neo4j
+poetry run engrama check-structure  # Portão 1: confere com o groundtruth
 ```
+
+O grafo fica no Neo4j Browser em http://localhost:7474.
 
 ## Qualidade
 
 ```bash
-poetry run pytest             # testes
+poetry run pytest             # testes; os de contrato usam o Neo4j se ele estiver de pé
 poetry run ruff check .       # lint
 poetry run lint-imports       # regra de dependência entre camadas
 ```
