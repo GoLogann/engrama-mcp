@@ -20,7 +20,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-markers = ["integration: precisa do Neo4j do docker compose"]
+markers = ["integration: precisa do Neo4j do docker compose ou dos clones em .cache/repos"]
 
 [tool.ruff]
 line-length = 100

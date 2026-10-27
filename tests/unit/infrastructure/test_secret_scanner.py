@@ -17,6 +17,11 @@ LEAKS = [
     ('\t\tsecret = "insecure-default-secret"', "insecure-default-secret"),
     ("DATABASE_URL=postgres://labsc:devpass123@localhost:5432/db", "devpass123"),
     ('token = "ghp_1234567890abcdefghijABCDEFGHIJ123456"', "ghp_1234567890abcdefghijABCDEFGHIJ"),
+    ("      API_KEY: ${API_KEY:-dev-key-local}", "dev-key-local"),
+    ("      CURATION_API_KEY: ${API_KEY:-dev-key-local}", "dev-key-local"),
+    ("      DB_PASSWORD: ${DB_PASSWORD:=devpass123}", "devpass123"),
+    ("      RESEARCH_EXPORT_SALT: sal-de-desenvolvimento", "sal-de-desenvolvimento"),
+    ("  key_passphrase = frase-de-desenvolvimento", "frase-de-desenvolvimento"),
 ]
 
 
@@ -38,6 +43,8 @@ def test_mascara_credenciais_dos_repos(line, secret):
         "          password: passwordController.text,",
         "- [ ] `JWT_SECRET` e `JWT_EXPIRES_IN` via env",
         "POSTGRES_DB: phishing_quest",
+        "      API_KEY: ${API_KEY:-}",
+        "      API_KEY: ${API_KEY}",
     ],
 )
 def test_preserva_referencias_e_nomes(line):
@@ -69,3 +76,9 @@ def test_mantem_a_chave_e_informa_a_linha():
 )
 def test_politica_de_arquivos(path, excluded):
     assert scanner.excludes(path) is excluded
+
+
+def test_mascara_so_o_default_e_preserva_a_variavel():
+    redaction = scanner.redact("      API_KEY: ${API_KEY:-dev-key-local}")
+
+    assert redaction.text == f"      API_KEY: ${{API_KEY:-{REDACTED}}}"
