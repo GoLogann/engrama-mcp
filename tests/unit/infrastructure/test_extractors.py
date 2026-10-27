@@ -222,6 +222,35 @@ def test_compose_so_conta_postgres_com_banco_e_soma_migrations():
         ),
         ("qdrant", "vectors", ["repo/docker-compose.yml:6@ccccccc"]),
     ]
+    assert "colecao do Qdrant nao encontrada" in facts.diagnostics[0]
+
+
+def test_compose_usa_a_colecao_do_qdrant_definida_no_codigo():
+    facts = run(
+        ComposeExtractor(),
+        Stack.PYTHON_FASTAPI,
+        {
+            "docker-compose.yml": """\
+                services:
+                  vectors:
+                    image: qdrant/qdrant:v1.18.0
+            """,
+            "app/core/config.py": """\
+                class Settings(BaseSettings):
+                    DB_NAME: str = "forge"
+                    COLLECTION_NAME: str = "phishing_articles"
+            """,
+            "tests/conftest.py": 'COLLECTION_NAME = "so_de_teste"\n',
+        },
+    )
+
+    (store,) = facts.datastores
+    assert (store.kind, store.name) == ("qdrant", "phishing_articles")
+    assert [str(e) for e in store.evidence] == [
+        "repo/docker-compose.yml:2@ccccccc",
+        "repo/app/core/config.py:3@ccccccc",
+    ]
+    assert facts.diagnostics == ()
 
 
 def test_issues_do_proprio_repo_e_de_outro_repo_do_catalogo():

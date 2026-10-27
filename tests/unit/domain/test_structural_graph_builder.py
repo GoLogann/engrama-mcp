@@ -65,6 +65,14 @@ def test_modulo_da_raiz_pertence_ao_repo():
     assert ("Module(forge-api:.)", "Repo(forge-api)") in edges_of(graph, EdgeKind.PART_OF)
 
 
+def test_repo_pertence_ao_projeto_com_o_repo_no_commit_fixado_como_evidencia():
+    graph = build(modules=[], routes=[])
+
+    (edge,) = [e for e in graph.edges if str(e.source) == "Repo(forge-api)"]
+
+    assert str(edge.provenance.evidence[0]) == f"https://github.com/x/forge-api/tree/{C}"
+
+
 def test_rota_vira_endpoint_exposto_pelo_modulo():
     graph = build()
 

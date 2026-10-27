@@ -55,10 +55,11 @@ class StructuralGraphBuilder:
         validity: Validity,
     ) -> StructuralGraph:
         nodes: dict[NodeRef, Node] = {project.ref: project, repo.ref: repo}
+        # Que o repo pertence ao projeto e uma afirmacao do catalogo, nao do
+        # codigo. A evidencia e o repo no commit fixado, que da para abrir e conferir.
+        snapshot = Evidence.in_document(f"{repo.url.removesuffix('.git')}/tree/{repo.commit}")
         edges: list[Edge] = [
-            self._edge(
-                EdgeKind.PART_OF, repo.ref, project.ref, [Evidence.in_document(repo.url)], validity
-            )
+            self._edge(EdgeKind.PART_OF, repo.ref, project.ref, [snapshot], validity)
         ]
 
         module_paths = (
