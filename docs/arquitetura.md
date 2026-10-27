@@ -70,7 +70,8 @@ Uma `CALLS` pertence ao repo cliente, e só existe se cliente e servidor entram 
 Limitações conhecidas, registradas como diagnóstico quando aparecem:
 
 - `include_router(..., prefix=...)` no FastAPI e `Any`/`Handle` no Gin não são extraídos. Nenhum dos quatro repos os usa hoje.
-- `issue #N` sempre aponta para o repo do arquivo. No frontend, "issue #7 do backend" vira a issue #7 do frontend.
+- `issue #N` vale para o repo do arquivo, salvo se logo depois (na mesma linha ou na linha de comentário seguinte) vier `do repo <nome>`, `do <nome>` ou `do backend`. Este último resolve pelo `consumes` do repo e só vale quando há exatamente um; com zero ou vários, a citação é ignorada e sai um diagnóstico. Qualquer outra forma de apontar para outro repo continua sendo lida como o repo do arquivo.
+- Um caminho fora da forma canônica (o curinga `*filepath` do Gin, `$id.json` do Dart) vira diagnóstico e só aquela rota é ignorada; a ingestão segue.
 - A relação entre repos vem de `consumes` em `config/repos.yaml`. Um repo que faz chamadas e não declara `consumes` não é relacionado a ninguém numa ingestão parcial; `engrama ingest` sem `--repo` sempre refaz tudo.
 - Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
 
