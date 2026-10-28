@@ -12,6 +12,7 @@ from engrama.bootstrap.settings import Settings
 from engrama.domain.services import (
     DocumentationGraphBuilder,
     DocumentChunker,
+    ReciprocalRankFusion,
     RouteMentionMatcher,
     RouteNormalizer,
     StructuralGraphBuilder,
@@ -20,6 +21,7 @@ from engrama.infrastructure.config.yaml_catalog import YamlRepositoryCatalog
 from engrama.infrastructure.config.yaml_golden_questions import YamlGoldenQuestions
 from engrama.infrastructure.config.yaml_ground_truth import YamlGroundTruthSource
 from engrama.infrastructure.documents import RepositoryDocumentExtractor
+from engrama.infrastructure.embeddings.voyage_embedder import VoyageEmbedder
 from engrama.infrastructure.extractors import (
     ComposeExtractor,
     FastApiExtractor,
@@ -33,6 +35,7 @@ from engrama.infrastructure.neo4j.connection import open_driver
 from engrama.infrastructure.neo4j.graph_writer import Neo4jGraphWriter
 from engrama.infrastructure.neo4j.knowledge_index import Neo4jKnowledgeIndex
 from engrama.infrastructure.neo4j.structure_reader import Neo4jStructureReader
+from engrama.infrastructure.neo4j.vector_store import Neo4jVectorStore
 from engrama.infrastructure.security.secret_scanner import RegexSecretScanner
 from engrama.infrastructure.system.clock import SystemClock
 
@@ -79,9 +82,18 @@ class Container(containers.DeclarativeContainer):
     )
     document_extractor = providers.Singleton(RepositoryDocumentExtractor, route_normalizer)
 
+    rank_fusion = providers.Singleton(ReciprocalRankFusion)
+    embedder = providers.Singleton(
+        VoyageEmbedder,
+        settings.provided.voyage_api_key.get_secret_value.call(),
+        settings.provided.embedding_model,
+        settings.provided.embedding_dimensions,
+    )
+
     graph_writer = providers.Singleton(Neo4jGraphWriter, neo4j_driver)
     structure_reader = providers.Singleton(Neo4jStructureReader, neo4j_driver)
-    knowledge_index = providers.Singleton(Neo4jKnowledgeIndex, neo4j_driver)
+    vector_store = providers.Singleton(Neo4jVectorStore, neo4j_driver)
+    knowledge_index = providers.Singleton(Neo4jKnowledgeIndex, neo4j_driver, embedder, rank_fusion)
 
     ingest_repository = providers.Factory(IngestRepository, source_repository, extractors)
     link_calls_to_routes = providers.Factory(LinkCallsToRoutes, graph_builder)
@@ -110,6 +122,8 @@ class Container(containers.DeclarativeContainer):
         writer=graph_writer,
         structure=structure_reader,
         clock=clock,
+        embedder=embedder,
+        vectors=vector_store,
     )
     search_knowledge = providers.Factory(SearchKnowledge, knowledge_index)
     measure_source_recall = providers.Factory(

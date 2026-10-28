@@ -20,6 +20,7 @@ from engrama.domain.value_objects.code_facts import DeclaredRoute
 from engrama.infrastructure.documents import RepositoryDocumentExtractor
 from engrama.infrastructure.security.secret_scanner import RegexSecretScanner
 from tests.fakes.graph import InMemoryGraph
+from tests.fakes.knowledge import FakeEmbedder, InMemoryVectorStore
 from tests.fakes.sources import FixedClock, InMemorySourceRepository, StaticCatalog
 
 C = "b" * 40
@@ -38,7 +39,7 @@ FILES = {
 }
 
 
-def indexer(graph, files=None, endpoints=None):
+def indexer(graph, files=None, endpoints=None, vectors=None):
     sources = InMemorySourceRepository(files if files is not None else FILES)
     read = ReadRepositoryDocuments(
         sources, RepositoryDocumentExtractor(RouteNormalizer()), RegexSecretScanner()
@@ -53,6 +54,8 @@ def indexer(graph, files=None, endpoints=None):
         writer=graph,
         structure=graph,
         clock=FixedClock(),
+        embedder=FakeEmbedder(dimensions=16),
+        vectors=vectors if vectors is not None else InMemoryVectorStore(graph),
     )
 
 
@@ -189,3 +192,50 @@ def test_endpoint_nao_e_regravado_pela_documentacao():
 
     after = graph.nodes[(NodeKind.ENDPOINT.value, f"{API.name}:POST /api/v1/generate")]
     assert after is before
+
+
+def test_todo_pedaco_gravado_ganha_vetor():
+    """E tambem prova a ordem: o vetor e gravado depois do no do pedaco.
+
+    `InMemoryVectorStore` ignora chave que nao esta no grafo, como o adapter
+    real faz com `MATCH`. Se o caso de uso embutisse antes de escrever, nada
+    seria guardado e a conta daria zero.
+    """
+    graph = InMemoryGraph()
+    store = InMemoryVectorStore(graph)
+
+    report = indexer(graph, vectors=store).execute()
+
+    chunks = sum(summary.chunks for summary in report.repos)
+    assert chunks > 0
+    assert report.vectors == chunks
+    assert set(store.vectors) == {key for kind, key in graph.nodes if kind == NodeKind.CHUNK.value}
+
+
+def test_repo_sem_documento_nao_gasta_chamada_de_embedding():
+    """Lista vazia nao vira requisicao: a cota e por token, mas a chamada
+    tambem custa latencia e pode falhar."""
+
+    class Recusa(FakeEmbedder):
+        def embed_documents(self, texts):
+            assert texts, "nao deveria embutir lista vazia"
+            return super().embed_documents(texts)
+
+    graph = InMemoryGraph()
+    indexer_sem_docs = IndexDocuments(
+        catalog=StaticCatalog(CATALOG),
+        read=ReadRepositoryDocuments(
+            InMemorySourceRepository({"forge-api": {}, "forge-front": {}}),
+            RepositoryDocumentExtractor(RouteNormalizer()),
+            RegexSecretScanner(),
+        ),
+        matcher=RouteMentionMatcher(),
+        builder=DocumentationGraphBuilder(DocumentChunker(max_chars=1000)),
+        writer=graph,
+        structure=graph,
+        clock=FixedClock(),
+        embedder=Recusa(dimensions=16),
+        vectors=InMemoryVectorStore(graph),
+    )
+
+    assert indexer_sem_docs.execute().vectors == 0

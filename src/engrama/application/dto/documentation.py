@@ -57,3 +57,6 @@ class IndexingReport:
     unmatched: tuple[RouteMention, ...] = ()
     ambiguous: tuple[RouteMention, ...] = ()
     diagnostics: tuple[str, ...] = ()
+    # Pedacos que ficaram com vetor. Menor que o total de pedacos significa
+    # que a metade vetorial da busca nao enxerga o resto.
+    vectors: int = 0

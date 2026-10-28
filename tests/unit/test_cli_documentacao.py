@@ -162,3 +162,21 @@ def test_check_sources_mostra_acerto_e_o_que_faltou():
     assert "Arquivo certo na lista: 1/2 (50%)" in result.stdout
     assert "n17: api/README.md:52" in result.stdout
     assert "n01: api/README.md:3 em 1º linha coberta" in result.stdout
+
+
+def test_index_docs_diz_quantos_pedacos_ficaram_com_vetor():
+    report = IndexingReport(repos=(summary(),), known_endpoints=75, vectors=12)
+
+    result = runner.invoke(cli(index_documents=report), ["index-docs"])
+
+    assert "Pedaços com vetor: 12 de 12" in result.stdout
+    assert "não enxerga" not in result.stdout
+
+
+def test_index_docs_avisa_quando_falta_vetor_em_algum_pedaco():
+    report = IndexingReport(repos=(summary(),), known_endpoints=75, vectors=5)
+
+    result = runner.invoke(cli(index_documents=report), ["index-docs"])
+
+    assert "Pedaços com vetor: 5 de 12" in result.stdout
+    assert "A metade vetorial da busca não enxerga os pedaços sem vetor." in result.stdout

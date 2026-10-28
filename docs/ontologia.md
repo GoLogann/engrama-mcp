@@ -25,7 +25,7 @@ Decisões de modelagem:
 
 - **`Module` é um diretório**, não um arquivo. É o nível em que resumos fazem sentido; o arquivo e a linha exatos ficam na evidência de cada aresta.
 - **`Issue` entrou na ontologia** porque a aresta `REFERENCES_ISSUE` do doc de fundamentação precisava de um alvo. O código dos quatro repos cita issues com frequência (`issue #7`, `#36`).
-- **`Chunk` é o pedaço de documento que entra no índice de busca** (ADR 0010), com a faixa de linhas de onde saiu: a fonte citada pelo MCP precisa apontar para a linha, como as fontes das perguntas de ouro. Um `Doc` de 983 linhas não serve como unidade de busca.
+- **`Chunk` é o pedaço de documento que entra no índice de busca** (ADR 0010), com a faixa de linhas de onde saiu: a fonte citada pelo MCP precisa apontar para a linha, como as fontes das perguntas de ouro. Um `Doc` de 983 linhas não serve como unidade de busca. O `Chunk` também carrega a propriedade `embedding` (1024 números), que é o que o índice vetorial lê; ela é escrita por fora do grafo de fatos, pela porta `VectorStore` (ADR 0011), e nenhuma leitura do MCP a devolve.
 - **`Endpoint` guarda a rota na forma canônica:** começa com `/`, sem barra final nem query string, parâmetros como `{nome}`. `:id` (Gin), `${id}` (TypeScript) e `$id` (Dart) são convertidos na extração. Ao casar chamada com rota, os nomes dos parâmetros são ignorados (`HttpRoute.shape`).
 
 ## Arestas

@@ -1,5 +1,4 @@
 // Unicidade da chave natural de cada familia de no (formatos em docs/ontologia.md).
-// O indice vetorial da busca hibrida entra quando houver chave de embeddings.
 CREATE CONSTRAINT project_key IF NOT EXISTS FOR (n:Project) REQUIRE n.key IS UNIQUE;
 CREATE CONSTRAINT repo_key IF NOT EXISTS FOR (n:Repo) REQUIRE n.key IS UNIQUE;
 CREATE CONSTRAINT module_key IF NOT EXISTS FOR (n:Module) REQUIRE n.key IS UNIQUE;
@@ -22,3 +21,11 @@ CREATE INDEX episode_valid_to IF NOT EXISTS FOR (n:Episode) ON (n.valid_to);
 // com IF NOT EXISTS, o que ja existe fica como esta.
 CREATE FULLTEXT INDEX chunk_text IF NOT EXISTS FOR (n:Chunk) ON EACH [n.text, n.heading]
 OPTIONS {indexConfig: {`fulltext.analyzer`: 'portuguese'}};
+
+// Metade vetorial da busca hibrida. O tamanho esta fixo aqui porque o indice
+// nasce com ele: trocar o modelo de embedding para outro tamanho exige apagar
+// e recriar o indice, e o `VoyageEmbedder` recusa gravar vetor de tamanho
+// diferente justamente para isso nao passar em silencio. Cosseno porque os
+// vetores da Voyage ja vem normalizados.
+CREATE VECTOR INDEX chunk_embedding IF NOT EXISTS FOR (n:Chunk) ON n.embedding
+OPTIONS {indexConfig: {`vector.dimensions`: 1024, `vector.similarity_function`: 'cosine'}};

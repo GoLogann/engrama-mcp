@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 
 from engrama.application.dto.documentation import (
     DocumentSummary,
@@ -7,9 +7,11 @@ from engrama.application.dto.documentation import (
     RepositoryDocuments,
 )
 from engrama.application.ports.graph import GraphWriter, StructureReader
+from engrama.application.ports.knowledge import Embedder, VectorStore
 from engrama.application.ports.sources import RepositoryCatalog
 from engrama.application.ports.system import Clock
 from engrama.application.use_cases.read_repository_documents import ReadRepositoryDocuments
+from engrama.domain.entities.documentation import Chunk
 from engrama.domain.services import DocumentationGraphBuilder, RepositoryGraph, RouteMentionMatcher
 from engrama.domain.value_objects import NodeKind, Validity
 from engrama.domain.value_objects.document_facts import DocumentKind, RouteMention
@@ -42,6 +44,8 @@ class IndexDocuments:
         writer: GraphWriter,
         structure: StructureReader,
         clock: Clock,
+        embedder: Embedder,
+        vectors: VectorStore,
     ) -> None:
         self._catalog = catalog
         self._read = read
@@ -50,6 +54,8 @@ class IndexDocuments:
         self._writer = writer
         self._structure = structure
         self._clock = clock
+        self._embedder = embedder
+        self._vectors = vectors
 
     def execute(self, only: Collection[str] = ()) -> IndexingReport:
         catalog = self._catalog.load()
@@ -87,7 +93,20 @@ class IndexDocuments:
             unmatched=tuple(unmatched),
             ambiguous=tuple(ambiguous),
             diagnostics=tuple(diagnostics),
+            vectors=self._embed(graphs.values()),
         )
+
+    def _embed(self, graphs: Iterable[RepositoryGraph]) -> int:
+        """Embute os pedacos depois da escrita, nunca antes.
+
+        O vetor so faz sentido para pedaco que existe no grafo: se a escrita
+        falhar, nenhum vetor foi gasto, e `store` ignora chave inexistente.
+        """
+        chunks = [node for graph in graphs for node in graph.nodes if isinstance(node, Chunk)]
+        if not chunks:
+            return 0
+        vectors = self._embedder.embed_documents([chunk.text for chunk in chunks])
+        return self._vectors.store(dict(zip((chunk.key for chunk in chunks), vectors, strict=True)))
 
     @staticmethod
     def _summary(documents: RepositoryDocuments, graph: RepositoryGraph) -> DocumentSummary:

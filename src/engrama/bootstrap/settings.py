@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     # Sonnet por decisao de custo: o credito da API e pequeno, e os resumos da
     # Fase 2 sao muitos (98 modulos). Trocar e mudar ENGRAMA_LLM_MODEL.
     llm_model: str = Field(default="claude-sonnet-5-5", validation_alias="ENGRAMA_LLM_MODEL")
+    # A chave criada no Atlas (`AI Model APIs`) e a antiga da Voyage falam com
+    # enderecos diferentes; o cliente decide pelo formato da chave.
+    voyage_api_key: SecretStr = SecretStr("")
+    embedding_model: str = Field(
+        default="voyage-4-large", validation_alias="ENGRAMA_EMBEDDING_MODEL"
+    )
+    # Precisa casar com `vector.dimensions` do indice em schema.cypher.
+    embedding_dimensions: int = Field(default=1024, validation_alias="ENGRAMA_EMBEDDING_DIMENSIONS")
     cache_dir: Path = Field(default=Path(".cache"), validation_alias="ENGRAMA_CACHE_DIR")
     repos_config: Path = Field(
         default=Path("config/repos.yaml"), validation_alias="ENGRAMA_REPOS_CONFIG"

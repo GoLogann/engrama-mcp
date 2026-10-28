@@ -89,7 +89,16 @@ Cada pedaço (`Chunk`) guarda a faixa de linhas de onde saiu, para a fonte ser c
 
 A máscara de segredos (`SecretScanner.redact`) roda aqui, antes de o texto virar nó: o que o grafo guarda é sempre a versão mascarada, e o relatório diz quantos valores foram mascarados em cada repo. A política está em [seguranca.md](seguranca.md).
 
-A busca usa o índice de texto completo do Neo4j com analisador português, atrás da porta `KnowledgeIndex`. A parte vetorial da busca híbrida entra quando houver chave de embeddings, juntando os dois lados por RRF sem mudar a porta.
+A busca é híbrida, atrás da porta `KnowledgeIndex` (ADR 0011). Duas metades independentes:
+
+| Metade | Como acha | Adapter |
+| --- | --- | --- |
+| Palavra | Índice de texto completo do Neo4j, analisador português | `Neo4jKnowledgeIndex` |
+| Significado | Índice vetorial do Neo4j sobre embeddings da Voyage | `Neo4jKnowledgeIndex` + `VoyageEmbedder` |
+
+Elas acham coisas diferentes: a primeira exige a palavra, a segunda entende que "migrations" e `flyway` falam do mesmo assunto. Os dois resultados se juntam por `ReciprocalRankFusion`, um serviço de domínio: a pontuação do Lucene e a similaridade de cosseno estão em escalas incomparáveis, então a fusão usa só a **posição** em cada lista.
+
+O vetor não entra na entidade `Chunk`: é artefato de recuperação, não fato do domínio. Quem embute é a porta `Embedder` e quem grava é a `VectorStore`, chamadas por `IndexDocuments` **depois** da escrita do grafo — vetor de pedaço que não existe é ignorado, nunca cria nó.
 
 As arestas da documentação de um repo têm `owner = "<repo>:docs"`, camada separada da estrutura: a aposentadoria de arestas é por dono (ADR 0009), então indexar documentos não encerra o que `engrama ingest` gravou, nem o contrário.
 

@@ -127,8 +127,12 @@ def _print_indexing(report: IndexingReport) -> None:
             f"{repo.chunks} pedaços, {repo.endpoints_documented} endpoints documentados, "
             f"{repo.redactions} valores mascarados"
         )
+    chunks = sum(repo.chunks for repo in report.repos)
+    typer.echo(f"\nPedaços com vetor: {report.vectors} de {chunks}")
+    if report.vectors < chunks:
+        typer.echo("  A metade vetorial da busca não enxerga os pedaços sem vetor.")
     typer.echo(
-        f"\nEndpoints conhecidos no grafo: {report.known_endpoints} | rotas citadas sem "
+        f"Endpoints conhecidos no grafo: {report.known_endpoints} | rotas citadas sem "
         f"endpoint: {len(report.unmatched)} | ambíguas: {len(report.ambiguous)}"
     )
     for mention in report.unmatched:
