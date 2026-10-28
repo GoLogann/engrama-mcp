@@ -4,7 +4,7 @@ Diário de desenvolvimento, versionado desde 27/10/2026 (antes ficava só local,
 
 ## Estado atual
 
-Atualizado em 27/10/2026.
+Atualizado em 28/10/2026.
 
 | Fase | Situação |
 | --- | --- |
@@ -13,7 +13,7 @@ Atualizado em 27/10/2026.
 | Fase 1: grafo estrutural | Portão 1 aprovado (75/75 rotas, 33/33 chamadas, 3/3 bancos). PR #2 mergeado por Logan |
 | Dívidas das Fases 0 e 1 | PR #3 mergeado por Logan |
 | Revisão independente das Fases 0 e 1 | Veredito do revisor: **reprovado** (2 bloqueantes). Todas as correções mergeadas no PR #4 (merge `633baf5`), com CI verde em 3.12 e 3.13. As Fases 0 e 1 estão fechadas |
-| Fase 2: docs, resumos, comunidades | Parte sem LLM entregue (PR #6): documentos indexados, busca por texto, `redact` ligado. Resumos, conceitos, comunidades e embeddings seguem bloqueados por chave de API |
+| Fase 2: docs, resumos, comunidades | Parte sem LLM entregue (PR #6): documentos indexados, busca por texto, `redact` ligado. Busca por significado entregue com a chave da Voyage: 91% de fonte correta em k=10, contra 82% da busca por palavra (ADR 0011). Resumos, conceitos e comunidades seguem pendentes — dependem da chave da Anthropic, que já existe, e de eu estimar o custo |
 
 ## Pendências abertas
 
@@ -24,7 +24,8 @@ Atualizado em 27/10/2026.
 - [ ] Decidir sobre a conferência por execução: o classificador de permissões bloqueou o `go test` que listaria as rotas do Gin pelo próprio framework. Ou você roda, ou libera a permissão.
 - [ ] **Reiniciar a sessão do Claude Code** para o `revisor-de-entregas` ser registrado de verdade (a definição já está no repo).
 - [ ] Escolher a licença do repo público (hoje não há `LICENSE`).
-- [ ] Fornecer `ANTHROPIC_API_KEY` (ou `ant auth login`) e `VOYAGE_API_KEY` no `.env` antes da parte da Fase 2 que usa LLM. Sem previsão: Logan não consegue por enquanto, então o trabalho segue só com o que não precisa delas.
+- [x] ~~Fornecer `ANTHROPIC_API_KEY` e `VOYAGE_API_KEY`~~ — as duas entraram em 28/10/2026. A da Voyage destravou a busca por significado; a da Anthropic tem US$ 5 de crédito, e por isso o modelo padrão passou a ser `claude-sonnet-5-5`.
+- [ ] Decidir se cadastra forma de pagamento na Voyage. Sem ela a conta fica em 3 requisições e 10 mil tokens por minuto, o que deixa `index-docs` e `check-sources` em escala de minutos. Cadastrar libera o limite padrão e mantém os 200 milhões de tokens gratuitos, então para o nosso volume continuaria custando zero.
 - [ ] Aprovar o custo dos resumos antes de rodar essa parte (vou estimar com `count_tokens`).
 - [ ] Confirmar `consumes` e `base_path` de `config/repos.yaml`.
 - [ ] Dizer se `nginx.conf.template` e outros arquivos de configuração sem extensão conhecida devem ser indexados. Hoje entram `*.md`, `*.config` e o `package.json` da raiz; a fonte de n12 (`phishforge-frontend/nginx.conf.template:40`) fica fora, e com ela a pergunta não tem como ser respondida pela camada de documentação.
@@ -48,7 +49,7 @@ Atualizado em 27/10/2026.
 - [ ] **Origens permitidas por aresta são minha interpretação** (ADR 0004). `DOCUMENTED_IN`, `MENTIONS_CONCEPT` e `ABOUT` precisam ser revalidadas quando as Fases 2 e 3 criarem essas arestas. Uma síntese de reflexão gerada por LLM não cabe hoje como `Episode`.
 - [ ] **Quem gera o `id` do episódio.** `Episode.record` recebe o id pronto. O caso de uso `RecordEpisode` (Fase 3) deve gerar o UUID.
 - [ ] **Valor de credencial escrito em prosa ainda passa pela máscara** (o padrão de `API_KEY` em `README.md:36` e `guia_geracao_exemplos.md:153`), e agora esses dois textos são indexados. O `redact` já roda na indexação (fechado no PR #6); falta decidir entre montar a lista de valores a partir do compose e dos `.env.example` ou revisar a saída na Fase 4. Está em `docs/seguranca.md`, com as duas limitações medidas.
-- [ ] **n18 e t12 continuam sem fonte recuperável.** Os arquivos já são indexados (PR #6), mas a busca por palavra não os acha: a pergunta de t12 fala de "migrations" e o arquivo diz `flyway`/`migrate`; a de n18 fala de "tecnologias" e o `package.json` lista nomes de pacote. Indexar o caminho do arquivo foi medido e não resolveu. A saída é a parte vetorial da busca, que depende da chave da Voyage. O gatilho do ADR 0008 (reabrir K8s/manifestos) não disparou: a falha é de busca, não de falta de estrutura no grafo.
+- [x] ~~n18 e t12 sem fonte recuperável~~ — **t12 resolvido** pela busca por significado (o vetor acha os dois `flyway*.config`); **n18 não**: o `package.json` fica em 36º lugar mesmo no vetor, porque a pergunta fala de "tecnologias" e o arquivo lista nomes de pacote. n12 (README do frontend) também continua fora em k=10, em 18º. Medições no ADR 0011.
 - [ ] **Comunidades (Louvain) ficaram fora do PR #6.** Eu tinha oferecido no mesmo pacote. Deixei de fora porque sem resumo nenhuma pergunta de ouro depende de agrupamento, e persistir comunidade exige uma família de nó nova que a etapa de resumo talvez queira diferente. Entra junto com `SummarizeCommunities`.
 - [ ] **Módulos (98) não têm groundtruth.** São derivados da lista de arquivos versionados. As citações de issue foram conferidas por regex (208/208 linhas), mas não à mão.
 - [ ] **Citação de issue de outro repo em outras formas** ("issue #N do módulo X do backend") ainda é lida como do próprio repo. Só `do repo <nome>`, `do <nome>` e `do backend` são resolvidos.
@@ -311,3 +312,35 @@ As 4 fontes que faltam são todas de vocabulário diferente do da pergunta — e
 - Meus dois erros de número (40 endpoints, 16 documentos) vieram do mesmo hábito: contar arestas e relatar como coisas, e somar um campo achando que era o total. Métrica que vai para o relatório merece conferência no banco, com `count(DISTINCT ...)`.
 - O achado I2 é o tipo de defeito que nenhum teste pega, porque o código fazia o que eu escrevi: o problema era o rótulo afirmar mais do que a medida sustenta. Revisor com contexto limpo é bom exatamente nisso.
 - Ao estreitar uma regra de segurança, escrever o caso contrário junto: os seis casos de I1 estão no teste, e três deles são o que a versão anterior deixava passar.
+
+### 28/10/2026 — Busca por significado, e a fusão que o plano previa não se pagou
+
+**Feito.** Logan criou a conta Voyage (pelo MongoDB Atlas, que é por onde a chave sai desde a compra) e me avisou que a chave da Anthropic também entrou, pedindo Sonnet 5.5 em vez de Opus porque só pôs US$ 5 de crédito. Com a chave de embedding, implementei a metade vetorial da busca: portas `Embedder` e `VectorStore`, `VoyageEmbedder`, `Neo4jVectorStore`, índice vetorial de 1024 com cosseno no `schema.cypher`, e `IndexDocuments` embutindo os 121 pedaços depois de escrever o grafo. Antes disso, só a chave validada: um `curl` contra `ai.mongodb.com` com os dois modelos candidatos.
+
+**Decisões.**
+- **O vetor não entra na entidade `Chunk`.** É artefato de recuperação, derivado do texto, não fato do domínio. Daí as duas portas e a gravação por fora do grafo de fatos.
+- **O ranking é o vetor; a palavra ficou como reserva** (ADR 0011). Isto contraria o plano, que pedia fusão por RRF, e eu não mudei sozinho: levei a medição ao Logan e ele escolheu.
+- **Removi o serviço de fusão que eu mesmo havia commitado** (`92577ce`, oito testes). Ficou sem uso, e código morto em repo público é pior que decisão registrada.
+- **`ranking()` entrou no contrato da porta.** Sem isso, um `check-sources` que caísse para a reserva reportaria o número de um motor sobre o outro.
+- **Só teto de taxa degrada a busca; erro de configuração sobe.** O `VoyageEmbedder` traduz o esgotamento para `EmbeddingUnavailable`, e o adapter do Neo4j não conhece a Voyage.
+
+**Medição.** Mesmas 22 fontes, `voyage-4-large` (arquivo / linha):
+
+| Variante | k=5 | k=10 | k=20 |
+| --- | --- | --- | --- |
+| Só palavra | 82% / 63% | 82% / 79% | 86% / 89% |
+| Só vetor | 86% / 74% | 91% / 74% | 95% / 79% |
+| Híbrida RRF | 86% / 68% | 86% / 74% | 91% / 79% |
+
+**Reflexões e aprendizados.**
+- **A fusão por RRF perdeu em todo tamanho de lista, e a causa é estrutural, não calibração.** Testei 18 combinações de `k` e profundidade, mais nove de uma variante por melhor posição: todas dão 86%. O RRF premia consenso, e aqui as duas buscas são complementares — o `flyway.config` que só o vetor acha em 6º lugar não cabe em dez vagas divididas. Foi o plano errando uma previsão razoável, e só a medição mostrou.
+- **Eu quase reportei "o `k` não faz diferença" sem verificar.** Dezoito linhas idênticas são cheiro de harness quebrado, não de descoberta. Imprimi as listas em `k=1` e `k=60`, vi que a ordem muda de verdade, e aí a conclusão passou a valer. Resultado uniforme merece a mesma desconfiança que resultado bom demais.
+- **Minha hipótese favorita caiu na medição.** Eu defendi manter as duas metades argumentando que consulta de casamento exato (`POST /api/v1/generate`, `flyway.locations`) favoreceria a palavra. Testei cinco: o vetor empata ou ganha em todas. Tinha virado argumento de estimação, e o certo era medir antes de usá-lo para justificar código.
+- **Achei um defeito meu revisando o próprio código, não por teste.** Em `_run(self, query, **parameters)` o Cypher entrava posicionalmente no parâmetro chamado `query` e a consulta lexical passava `query=` por palavra-chave. Os testes que pegariam isso são de integração e ficaram fora da rodada rápida — a lição é que marcador de integração cria uma zona onde erro de assinatura sobrevive ao `pytest -q`.
+- **O limite da conta sem forma de pagamento (3 req/min, 10 mil tokens/min) é restrição de desenho, não só de espera.** Mudou o tamanho do lote e me fez escrever espera com repetição, e deixa `check-sources` em escala de minutos.
+
+**Pendências geradas.**
+- Cobertura de linha caiu (74% no vetor contra 89% da palavra em k=20), e o MCP cita `arquivo:linha`. Vale medir se reranking ou pedaço menor recupera isso.
+- n12 e n18 continuam sem fonte recuperável em k=10.
+- A degradação por teto de taxa no meio de uma rodada só aparece como aviso no log; `ranking()` passa a dizer `palavra`, mas as buscas já feitas naquela rodada foram por vetor. O relatório não distingue rodada mista.
+- `ReciprocalRankFusion` pode voltar a fazer sentido na Fase 4, se uma tool fundir resultado de estrutura com resultado de documentação. Está em `92577ce`.

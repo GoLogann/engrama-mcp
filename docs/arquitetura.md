@@ -89,7 +89,18 @@ Cada pedaço (`Chunk`) guarda a faixa de linhas de onde saiu, para a fonte ser c
 
 A máscara de segredos (`SecretScanner.redact`) roda aqui, antes de o texto virar nó: o que o grafo guarda é sempre a versão mascarada, e o relatório diz quantos valores foram mascarados em cada repo. A política está em [seguranca.md](seguranca.md).
 
-A busca usa o índice de texto completo do Neo4j com analisador português, atrás da porta `KnowledgeIndex`. A parte vetorial da busca híbrida entra quando houver chave de embeddings, juntando os dois lados por RRF sem mudar a porta.
+A busca fica atrás da porta `KnowledgeIndex`, com dois modos (ADR 0011):
+
+| Modo | Quando | Como acha | Acha |
+| --- | --- | --- | --- |
+| Significado | há `VOYAGE_API_KEY` | índice vetorial do Neo4j sobre embeddings da Voyage | 91% das fontes (k=10) |
+| Palavra (reserva) | sem chave, ou teto de taxa esgotado | índice de texto completo, analisador português | 82% |
+
+O plano previa fundir os dois por RRF. Medido, o vetor puro ganha da fusão em todo tamanho de lista, por uma razão estrutural: as duas buscas são complementares, não redundantes, e o RRF premia consenso. Os números e o porquê estão no [ADR 0011](decisoes/0011-busca-por-significado-e-reserva-por-palavra.md).
+
+A reserva nunca é escolhida em silêncio: `ranking()` faz parte do contrato da porta e `engrama check-sources` imprime por qual motor mediu.
+
+O vetor não entra na entidade `Chunk`: é artefato de recuperação, não fato do domínio. Quem embute é a porta `Embedder` e quem grava é a `VectorStore`, chamadas por `IndexDocuments` **depois** da escrita do grafo — vetor de pedaço que não existe é ignorado, nunca cria nó.
 
 As arestas da documentação de um repo têm `owner = "<repo>:docs"`, camada separada da estrutura: a aposentadoria de arestas é por dono (ADR 0009), então indexar documentos não encerra o que `engrama ingest` gravou, nem o contrário.
 

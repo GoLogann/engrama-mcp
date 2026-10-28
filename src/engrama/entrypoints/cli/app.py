@@ -10,6 +10,7 @@ from engrama.application.dto.evaluation import SourceRecallReport
 from engrama.application.dto.ingestion import IngestionReport
 from engrama.application.dto.knowledge import ChunkHit
 from engrama.application.dto.structure_check import StructureCheckReport
+from engrama.application.ports.knowledge import BY_WORD
 from engrama.application.use_cases.build_structural_graph import BuildStructuralGraph
 from engrama.application.use_cases.check_structure import CheckStructureAgainstGroundTruth
 from engrama.application.use_cases.index_documents import IndexDocuments
@@ -127,8 +128,12 @@ def _print_indexing(report: IndexingReport) -> None:
             f"{repo.chunks} pedaços, {repo.endpoints_documented} endpoints documentados, "
             f"{repo.redactions} valores mascarados"
         )
+    chunks = sum(repo.chunks for repo in report.repos)
+    typer.echo(f"\nPedaços com vetor: {report.vectors} de {chunks}")
+    if report.vectors < chunks:
+        typer.echo("  A metade vetorial da busca não enxerga os pedaços sem vetor.")
     typer.echo(
-        f"\nEndpoints conhecidos no grafo: {report.known_endpoints} | rotas citadas sem "
+        f"Endpoints conhecidos no grafo: {report.known_endpoints} | rotas citadas sem "
         f"endpoint: {len(report.unmatched)} | ambíguas: {len(report.ambiguous)}"
     )
     for mention in report.unmatched:
@@ -144,9 +149,11 @@ def _print_indexing(report: IndexingReport) -> None:
 
 
 def _print_hits(hits: list[ChunkHit]) -> None:
+    # Quatro casas porque a nota e a da fusao por posicao, que fica na casa de
+    # 0,03: com duas casas todos os resultados pareceriam empatados.
     for position, hit in enumerate(hits, start=1):
         title = f"{hit.document_title} — {hit.heading}" if hit.heading else hit.document_title
-        typer.echo(f"{position}. {hit.source} ({hit.score:.2f}) {title}")
+        typer.echo(f"{position}. {hit.source} ({hit.score:.4f}) {title}")
         for line in hit.text.strip().splitlines()[:3]:
             typer.echo(f"     {line[:96]}")
         typer.echo("")
@@ -156,8 +163,13 @@ def _print_recall(report: SourceRecallReport) -> None:
     measured = len(report.lookups)
     typer.echo(
         f"Fontes medidas: {measured} de {measured + len(report.skipped)}, "
-        f"em {report.questions} perguntas (k={report.limit})"
+        f"em {report.questions} perguntas (k={report.limit}), ordenadas por {report.ranking}"
     )
+    if report.ranking == BY_WORD:
+        typer.echo(
+            "  Reserva por palavra: sem embeddings a busca acha menos fontes. "
+            "Defina VOYAGE_API_KEY para medir a busca que o projeto usa de verdade."
+        )
     typer.echo(
         f"Arquivo certo na lista: {report.found}/{measured} "
         f"({report.file_recall:.0%}) | pedaço que cobre a linha citada: "

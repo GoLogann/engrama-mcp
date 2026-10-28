@@ -36,7 +36,7 @@ def test_container_resolve_settings_com_padroes(monkeypatch, tmp_path):
 
     settings = Container().settings()
 
-    assert settings.llm_model == "claude-opus-5-5"
+    assert settings.llm_model == "claude-sonnet-5-5"
     assert settings.neo4j_uri == "bolt://localhost:7687"
 
 

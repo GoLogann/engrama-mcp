@@ -52,6 +52,10 @@ class MeasureSourceRecall:
             lookups=tuple(lookups),
             skipped=tuple(skipped),
             unmeasured=tuple(unmeasured),
+            # Lido depois das buscas, de proposito: e durante elas que a busca
+            # pode cair para a reserva por palavra, e o relatorio precisa
+            # dizer qual motor produziu estes numeros.
+            ranking=self._index.ranking(),
         )
 
     @staticmethod

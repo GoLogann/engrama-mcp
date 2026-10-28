@@ -115,7 +115,7 @@ def test_search_mostra_a_fonte_com_linha():
     result = runner.invoke(cli(search_knowledge=[hit()]), ["search", "compose"])
 
     assert result.exit_code == 0
-    assert "1. forge-api/README.md:52 (3.50) Forge — Instalação" in result.stdout
+    assert "1. forge-api/README.md:52 (3.5000) Forge — Instalação" in result.stdout
     assert "Rode o compose." in result.stdout
 
 
@@ -162,3 +162,39 @@ def test_check_sources_mostra_acerto_e_o_que_faltou():
     assert "Arquivo certo na lista: 1/2 (50%)" in result.stdout
     assert "n17: api/README.md:52" in result.stdout
     assert "n01: api/README.md:3 em 1º linha coberta" in result.stdout
+
+
+def test_index_docs_diz_quantos_pedacos_ficaram_com_vetor():
+    report = IndexingReport(repos=(summary(),), known_endpoints=75, vectors=12)
+
+    result = runner.invoke(cli(index_documents=report), ["index-docs"])
+
+    assert "Pedaços com vetor: 12 de 12" in result.stdout
+    assert "não enxerga" not in result.stdout
+
+
+def test_index_docs_avisa_quando_falta_vetor_em_algum_pedaco():
+    report = IndexingReport(repos=(summary(),), known_endpoints=75, vectors=5)
+
+    result = runner.invoke(cli(index_documents=report), ["index-docs"])
+
+    assert "Pedaços com vetor: 5 de 12" in result.stdout
+    assert "A metade vetorial da busca não enxerga os pedaços sem vetor." in result.stdout
+
+
+def test_check_sources_diz_por_qual_motor_a_busca_ordenou():
+    result = runner.invoke(
+        cli(measure_source_recall=recall_report(ranking="vetor")), ["check-sources"]
+    )
+
+    assert "ordenadas por vetor" in result.stdout
+    assert "Reserva por palavra" not in result.stdout
+
+
+def test_check_sources_avisa_quando_mediu_a_reserva_por_palavra():
+    result = runner.invoke(
+        cli(measure_source_recall=recall_report(ranking="palavra")), ["check-sources"]
+    )
+
+    assert "ordenadas por palavra" in result.stdout
+    assert "VOYAGE_API_KEY" in result.stdout

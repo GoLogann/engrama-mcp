@@ -73,6 +73,9 @@ class SourceRecallReport:
     lookups: tuple[SourceLookup, ...]
     skipped: tuple[SkippedSource, ...] = ()
     unmeasured: tuple[str, ...] = ()
+    # Qual motor ordenou: `vetor` ou `palavra`. A reserva por palavra acha
+    # menos fontes, entao um numero sem esta informacao nao diz nada.
+    ranking: str = ""
 
     def skipped_of(self, question_id: str) -> tuple[str, ...]:
         return tuple(item.source for item in self.skipped if item.question_id == question_id)
