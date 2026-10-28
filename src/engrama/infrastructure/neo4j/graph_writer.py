@@ -6,7 +6,7 @@ from pathlib import Path
 from neo4j import Driver, ManagedTransaction
 
 from engrama.application.ports.graph import GraphWriter
-from engrama.domain.services import StructuralGraph
+from engrama.domain.services import RepositoryGraph
 from engrama.infrastructure.neo4j.serialization import edge_properties, node_properties
 
 SCHEMA = Path(__file__).with_name("schema.cypher")
@@ -58,13 +58,13 @@ class Neo4jGraphWriter(GraphWriter):
             for statement in statements:
                 session.run(statement).consume()
 
-    def write(self, graphs: Mapping[str, StructuralGraph], run_id: str, at: datetime) -> None:
+    def write(self, graphs: Mapping[str, RepositoryGraph], run_id: str, at: datetime) -> None:
         with self._driver.session(database=self._database) as session:
             session.execute_write(self._write, graphs, run_id, at)
 
     @staticmethod
     def _write(
-        tx: ManagedTransaction, graphs: Mapping[str, StructuralGraph], run_id: str, at: datetime
+        tx: ManagedTransaction, graphs: Mapping[str, RepositoryGraph], run_id: str, at: datetime
     ) -> None:
         nodes = defaultdict(dict)
         for graph in graphs.values():

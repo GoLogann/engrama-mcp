@@ -8,7 +8,7 @@ from engrama.application.dto.structure_check import (
     GroundTruth,
     RouteFact,
 )
-from engrama.domain.services import StructuralGraph
+from engrama.domain.services import RepositoryGraph
 
 
 class GraphWriter(ABC):
@@ -19,7 +19,7 @@ class GraphWriter(ABC):
     def ensure_schema(self) -> None: ...
 
     @abstractmethod
-    def write(self, graphs: Mapping[str, StructuralGraph], run_id: str, at: datetime) -> None:
+    def write(self, graphs: Mapping[str, RepositoryGraph], run_id: str, at: datetime) -> None:
         """Grava o grafo de cada repo dono. Arestas de extracao de um dono que
         nao vieram nesta rodada deixam de valer em `at` (ganham `valid_to`)."""
 

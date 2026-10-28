@@ -5,7 +5,7 @@ from datetime import datetime
 from engrama.application.dto.structure_check import CallFact, DataStoreFact, RouteFact
 from engrama.application.ports.graph import GraphWriter, StructureReader
 from engrama.domain.entities import DataStore, Edge, EdgeKind, Endpoint, Node
-from engrama.domain.services import StructuralGraph
+from engrama.domain.services import RepositoryGraph
 
 
 @dataclass
@@ -29,7 +29,7 @@ class InMemoryGraph(GraphWriter, StructureReader):
     def ensure_schema(self) -> None:
         self.schema_ready = True
 
-    def write(self, graphs: Mapping[str, StructuralGraph], run_id: str, at: datetime) -> None:
+    def write(self, graphs: Mapping[str, RepositoryGraph], run_id: str, at: datetime) -> None:
         for graph in graphs.values():
             for node in graph.nodes:
                 self.nodes[(node.node_kind.value, node.key)] = node

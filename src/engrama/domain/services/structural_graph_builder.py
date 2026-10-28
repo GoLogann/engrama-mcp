@@ -1,6 +1,5 @@
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from engrama.domain.entities import (
@@ -16,16 +15,11 @@ from engrama.domain.entities import (
     Repo,
 )
 from engrama.domain.services.call_route_matcher import RouteMatch
+from engrama.domain.services.repository_graph import RepositoryGraph
 from engrama.domain.value_objects import Evidence, NodeRef, Provenance, Validity
 from engrama.domain.value_objects.code_facts import DataStoreUse, DeclaredRoute, IssueReference
 
 ROOT_MODULE = "."
-
-
-@dataclass(frozen=True, slots=True)
-class StructuralGraph:
-    nodes: tuple[Node, ...]
-    edges: tuple[Edge, ...]
 
 
 def _ancestors(path: str) -> list[str]:
@@ -53,7 +47,7 @@ class StructuralGraphBuilder:
         datastores: Sequence[DataStoreUse],
         issues: Sequence[IssueReference],
         validity: Validity,
-    ) -> StructuralGraph:
+    ) -> RepositoryGraph:
         nodes: dict[NodeRef, Node] = {project.ref: project, repo.ref: repo}
         # Que o repo pertence ao projeto e uma afirmacao do catalogo, nao do
         # codigo. A evidencia e o repo no commit fixado, que da para abrir e conferir.
@@ -104,7 +98,7 @@ class StructuralGraphBuilder:
         for (source, target), evidence in grouped.items():
             edges.append(self._edge(EdgeKind.REFERENCES_ISSUE, source, target, evidence, validity))
 
-        return StructuralGraph(tuple(nodes.values()), tuple(edges))
+        return RepositoryGraph(tuple(nodes.values()), tuple(edges))
 
     def calls(self, matches: Sequence[RouteMatch], validity: Validity) -> tuple[Edge, ...]:
         """CALLS do modulo cliente para o endpoint, com a evidencia dos dois lados:
