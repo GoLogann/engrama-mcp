@@ -328,7 +328,7 @@ def test_issue_do_backend_sem_como_resolver_nao_vira_citacao():
     )
 
     assert facts.issues == ()
-    assert "do backend" in facts.diagnostics[0]
+    assert "sem como resolver qual" in facts.diagnostics[0]
     assert "app/lib/x.dart:1" in facts.diagnostics[0]
 
 
@@ -374,3 +374,57 @@ def test_caminho_fora_da_forma_canonica_vira_diagnostico_e_nao_derruba_a_extraca
 
     assert routes(facts) == [("GET /health", "router/r.go", 5)]
     assert "/files/*filepath" in facts.diagnostics[0]
+
+
+def test_issue_no_repositorio_entre_crases_resolve_para_aquele_repo():
+    """`issue #38 no repositório \\`phishing_quest\\`` existe na PLANO_EXECUCAO
+    da Quest API. Antes a crase quebrava o casamento e a issue era atribuida
+    ao proprio repo, com confianca alta."""
+    facts = run(
+        IssueReferenceExtractor(["quest-api", "phishing_quest"]),
+        Stack.GO_GIN,
+        {"core/x.go": "// a issue #38 no repositorio `phishing_quest` cobre o ajuste\n"},
+        name="quest-api",
+    )
+
+    assert issues(facts) == [("phishing_quest", 38, 1)]
+
+
+def test_issue_do_app_sem_repo_com_esse_nome_nao_vai_para_o_proprio_repo():
+    """`issue #10 do app` existe na Quest API. O app e cliente dela, e
+    `consumes` lista quem ela consome — nao quem a consome — entao nao da para
+    resolver. Diagnostico, e nao aresta no repo errado."""
+    facts = run(
+        IssueReferenceExtractor(["quest-api", "phishing_quest"]),
+        Stack.GO_GIN,
+        {"core/x.go": "// ajuste combinado na issue #10 do app\n"},
+        name="quest-api",
+    )
+
+    assert facts.issues == ()
+    assert "sem como resolver qual" in facts.diagnostics[0]
+
+
+def test_participio_entre_o_numero_e_o_qualificador_nao_esconde_o_dono():
+    """`issue #38 aberta no front`: uma palavra no meio ainda e "logo depois"."""
+    facts = run(
+        IssueReferenceExtractor(["quest-api", "phishing_quest"]),
+        Stack.GO_GIN,
+        {"core/x.go": "// issue #38 aberta no front, ja corrigida\n"},
+        name="quest-api",
+    )
+
+    assert facts.issues == ()
+
+
+def test_duas_palavras_antes_do_qualificador_nao_contam_como_dono():
+    """ "issue #7 e o front tambem usa" fala do proprio repo: o qualificador
+    tem de estar logo depois, e uma palavra e o limite."""
+    facts = run(
+        IssueReferenceExtractor(["quest-api", "phishing_quest"]),
+        Stack.GO_GIN,
+        {"core/x.go": "// issue #7 e o front tambem usa isso\n"},
+        name="quest-api",
+    )
+
+    assert issues(facts) == [("quest-api", 7, 1)]

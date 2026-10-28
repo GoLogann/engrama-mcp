@@ -10,8 +10,18 @@ from engrama.infrastructure.extractors.base import TEST_DIRS, module_of
 _CODE_SUFFIXES = (".py", ".go", ".ts", ".tsx", ".js", ".dart")
 _NUMBER_LIST = r"#(?P<first>\d+)(?P<rest>(?:\s*(?:,|/|\be\b|\band\b)\s*#\d+)*)"
 _COMMENT_MARKER = re.compile(r"^\s*(?://+|/?\*+|#+)\s?")
+
+# O qualificador vem logo depois do numero, mas pode haver um participio no
+# meio: "issue #38 aberta no front". Uma palavra so, para "issue #7 e o front
+# tambem usa" nao virar citacao do front.
+_QUALIFIER = r"^[\s,;(]*(?:\w+\s+)?(?:d[oa]|n[oa])\s+"
 # "issue #5 do backend": o repo do servidor nao esta no texto, esta em `consumes`.
-_BACKEND = re.compile(r"^\s*(?:do|no|da)\s+(?:back-?end|servidor)\b", re.IGNORECASE)
+_BACKEND = re.compile(rf"(?i){_QUALIFIER}(?:back-?end|servidor)\b")
+# Qualificador que aponta para outro repo sem nomea-lo de forma resolvivel:
+# "do app", "no front". Quem consome este repo nao esta em `consumes` (que
+# lista quem ele consome), entao nao da para resolver — e atribuir ao proprio
+# repo seria gravar a issue errada com confianca alta.
+_FOREIGN = re.compile(rf"(?i){_QUALIFIER}(?:app|aplicativo|front(?:-?end)?|mobile|cliente|site)\b")
 
 
 def _numbers(match: re.Match[str]) -> list[int]:
@@ -43,8 +53,9 @@ class IssueReferenceExtractor(CodeExtractor):
         self._canonical = {name.lower(): name for name in known_repos}
         self._same_repo = re.compile(rf"(?i)\bissues?\s*{_NUMBER_LIST}")
         self._other_repo = re.compile(rf"(?<![\w/-])(?P<repo>{names})\s*{_NUMBER_LIST}")
+        # A crase e as aspas aparecem em "no repositorio `phishing_quest`".
         self._named_after = re.compile(
-            rf"(?i)^\s*(?:do|no)\s+(?:repo(?:sit[óo]rio)?\s+)?(?P<repo>{names})\b"
+            rf"(?i){_QUALIFIER}(?:repo(?:sit[óo]rio)?\s+)?[`'\"]?(?P<repo>{names})\b"
         )
 
     def supports(self, spec: RepositorySpec) -> bool:
@@ -65,8 +76,9 @@ class IssueReferenceExtractor(CodeExtractor):
                     for issue_repo, issue in found
                 ]
                 diagnostics += [
-                    f"{repo.name}/{path}:{number}: issue #{issue} 'do backend' sem como resolver "
-                    f"({len(spec.consumes)} repos em consumes); citacao ignorada"
+                    f"{repo.name}/{path}:{number}: issue #{issue} citada como de outro repo, "
+                    f"sem como resolver qual ({len(spec.consumes)} repos em consumes); "
+                    f"citacao ignorada em vez de atribuida a {repo.name}"
                     for issue in unresolved
                 ]
         return CodeFacts(issues=tuple(dict.fromkeys(references)), diagnostics=tuple(diagnostics))
@@ -88,8 +100,17 @@ class IssueReferenceExtractor(CodeExtractor):
         return found, unresolved
 
     def _target(self, tail: str, spec: RepositorySpec) -> str | None:
+        """O repo dono da issue, ou `None` quando a citacao aponta para fora e
+        nao da para dizer para onde.
+
+        `None` nunca significa "assume o proprio repo": e exatamente o caso em
+        que atribuir ao proprio seria gravar a issue errada com confianca
+        alta. Vira diagnostico e a citacao nao entra no grafo.
+        """
         if named := self._named_after.match(tail):
             return self._canonical[named.group("repo").lower()]
         if _BACKEND.match(tail):
             return spec.consumes[0] if len(spec.consumes) == 1 else None
+        if _FOREIGN.match(tail):
+            return None
         return spec.repo.name
