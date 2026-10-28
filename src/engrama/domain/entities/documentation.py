@@ -55,6 +55,46 @@ class Decision(Node):
 
 
 @dataclass(frozen=True, slots=True, eq=False)
+class Chunk(Node):
+    """Pedaco de um documento, com a faixa de linhas de onde saiu.
+
+    A busca devolve chunks, nao documentos inteiros, porque a fonte que o MCP
+    cita precisa apontar para o lugar do texto: as fontes das perguntas de
+    ouro sao `repo/caminho:linha`. O texto e o que entra no indice, ja
+    mascarado pela politica de segredos.
+    """
+
+    node_kind: ClassVar[NodeKind] = NodeKind.CHUNK
+
+    repo: str
+    path: str
+    index: int
+    text: str
+    first_line: int
+    last_line: int
+    heading: str = ""
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise InvalidNode(f"indice de chunk invalido: {self.index}")
+        if self.first_line < 1 or self.last_line < self.first_line:
+            raise InvalidNode(
+                f"faixa de linhas invalida em {self.path}: {self.first_line}-{self.last_line}"
+            )
+        if not self.text.strip():
+            raise InvalidNode(f"chunk sem texto em {self.path}#{self.index}")
+
+    @property
+    def key(self) -> str:
+        return f"{self.repo}:{self.path}#{self.index}"
+
+    @property
+    def source(self) -> str:
+        """Como a fonte e citada: `repo/caminho:primeira_linha`."""
+        return f"{self.repo}/{self.path}:{self.first_line}"
+
+
+@dataclass(frozen=True, slots=True, eq=False)
 class Issue(Node):
     """Issue do GitHub citada no codigo ou nos docs (`issue #7`)."""
 

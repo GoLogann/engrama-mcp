@@ -1,4 +1,4 @@
-from engrama.domain.entities.documentation import Concept, Decision, Doc, Issue
+from engrama.domain.entities.documentation import Chunk, Concept, Decision, Doc, Issue
 from engrama.domain.entities.edge import Edge, EdgeKind
 from engrama.domain.entities.experience import Episode, EpisodeType, Person
 from engrama.domain.entities.node import Node
@@ -13,6 +13,7 @@ from engrama.domain.entities.structure import (
 )
 
 __all__ = [
+    "Chunk",
     "Concept",
     "DataStore",
     "DataStoreKind",
