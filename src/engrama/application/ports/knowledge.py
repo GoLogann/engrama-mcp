@@ -11,6 +11,10 @@ Vector = tuple[float, ...]
 # do mesmo vocabulario, seja o indice do Neo4j ou um fake.
 BY_VECTOR = "vetor"
 BY_WORD = "palavra"
+# Uma rodada em que a busca degradou no meio: parte das consultas foi por
+# vetor e parte pela reserva. Dizer so `palavra` jogaria fora o que as
+# primeiras acharam; dizer so `vetor` esconderia a degradacao.
+BY_MIXED = "misto"
 
 
 class EmbeddingUnavailable(Exception):

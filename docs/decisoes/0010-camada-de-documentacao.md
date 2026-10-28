@@ -11,7 +11,7 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 
 ## Decisão
 
-1. **O que é documento.** Entram `*.md`, `*.config` e o `package.json` da raiz. Ficam fora os diretórios de dados e de plataforma (`data/`, `assets/`, `ios/`, `android/`, `macos/`, `windows/`, `linux/`, `web/`) e os de teste. `data/articles/phishing_examples.md` tem 1490 linhas de exemplos de phishing: indexar isso faria qualquer pergunta sobre e-mail casar com ele. `migrate/flyway.config` e `package.json` entram porque duas perguntas de ouro (t12 e n18) têm a resposta neles.
+1. **O que é documento.** Entram `*.md`, `*.config`, `*.conf`, `*.conf.template` e o `package.json` da raiz. *(Emenda de 28/10/2026: `*.conf` e `*.conf.template` entraram depois. Três das quatro fontes da pergunta t08 e uma das duas de n12 estão em `phishforge-frontend/nginx.conf.template`, que descreve como o frontend chega na API em produção — é documentação de operação, não dado. Medida antes de adotar: a regra traz exatamente um arquivo nos quatro repos, então não há ruído. `*.cfg` e `*.ini` ficaram de fora por não existirem em nenhum deles.)* Ficam fora os diretórios de dados e de plataforma (`data/`, `assets/`, `ios/`, `android/`, `macos/`, `windows/`, `linux/`, `web/`) e os de teste. `data/articles/phishing_examples.md` tem 1490 linhas de exemplos de phishing: indexar isso faria qualquer pergunta sobre e-mail casar com ele. `migrate/flyway.config` e `package.json` entram porque duas perguntas de ouro (t12 e n18) têm a resposta neles.
 
 2. **Decisão (ADR) pelo diretório.** `docs/decisoes/`, `docs/decisions/`, `adr/` e `adrs/` viram nós `Decision`; o resto vira `Doc`. O critério é o caminho, não o conteúdo: é determinístico e é a convenção dos repos do LABit. O `status` sai da linha "Status:" do próprio documento, e o título, do primeiro título do arquivo (ou do nome dele).
 
@@ -24,6 +24,8 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 6. **Dono próprio por camada:** as arestas da documentação de um repo têm `owner = "<repo>:docs"`. A aposentadoria do ADR 0009 é por dono, então indexar documentos não pode encerrar as arestas da estrutura do mesmo repo, nem o contrário. Também permite reindexar documentos sem reextrair código, o que importa quando essa etapa passar a gastar chamada de LLM.
 
 7. **O nó do endpoint não é regravado pela documentação.** A escrita faz `SET n += row`: incluir o `Endpoint` no grafo da documentação apagaria o `handler` que a estrutura gravou.
+
+11. **Issue citada num documento vira `REFERENCES_ISSUE`** *(acrescentado em 28/10/2026)*. A ontologia e o domínio já permitiam `Doc`/`Decision` → `Issue` com origem `extraction`; faltava a extração criar a aresta, porque o leitor de citações era um `CodeExtractor` e só abria arquivos de código. A leitura virou o serviço de domínio `IssueCitationReader`, que código e documento compartilham; o que difere é onde a citação é pendurada e o que conta como "logo depois" (em código, só a próxima linha de comentário; em Markdown, a próxima linha, a menos que esteja em branco). São 18 citações nos quatro repos, em 3 documentos.
 
 8. **A máscara de segredos roda na indexação**, antes de o texto virar nó, como o ADR 0005 previu.
 

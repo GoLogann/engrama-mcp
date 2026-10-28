@@ -5,6 +5,7 @@ from neo4j import Driver
 
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
 from engrama.application.ports.knowledge import (
+    BY_MIXED,
     BY_VECTOR,
     BY_WORD,
     Embedder,
@@ -86,9 +87,20 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
         self._embedder = embedder
         self._database = database
         self._degraded = False
+        self._used: set[str] = set()
 
     def ranking(self) -> str:
-        return BY_WORD if self._embedder is None or self._degraded else BY_VECTOR
+        """O motor desta rodada, somando o que cada busca de fato usou.
+
+        Uma rodada pode degradar no meio: as primeiras consultas vao por vetor
+        e, esgotado o teto de taxa, as seguintes vao por palavra. Reportar so
+        o estado final chamaria de `palavra` numeros que o vetor produziu.
+        """
+        if self._embedder is None:
+            return BY_WORD
+        if len(self._used) > 1:
+            return BY_MIXED
+        return next(iter(self._used), BY_WORD if self._degraded else BY_VECTOR)
 
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
         words = _WORDS.findall(query)
@@ -96,7 +108,9 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
             return []
         vector = self._embed(query)
         if vector is None:
+            self._used.add(BY_WORD)
             return self._lexical(words, limit)
+        self._used.add(BY_VECTOR)
         rows = self._run(_VECTOR, vector=vector, limit=limit)
         return [self._hit(row) for row in rows]
 

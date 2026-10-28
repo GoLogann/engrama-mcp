@@ -1,2 +1,8 @@
+# Venv dentro do projeto (`.venv/`), e nao no cache do Poetry.
+#
+# Duas razoes: o editor acha o interpretador sem configuracao, e apagar o
+# ambiente e apagar uma pasta do projeto. O preco e que `poetry install` nao
+# compartilha o ambiente entre checkouts do mesmo repo. Confirmado em
+# 28/10/2026 como escolha do projeto.
 [virtualenvs]
 in-project = true

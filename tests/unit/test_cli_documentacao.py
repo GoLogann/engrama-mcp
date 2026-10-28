@@ -198,3 +198,14 @@ def test_check_sources_avisa_quando_mediu_a_reserva_por_palavra():
 
     assert "ordenadas por palavra" in result.stdout
     assert "VOYAGE_API_KEY" in result.stdout
+
+
+def test_check_sources_avisa_quando_a_rodada_degradou_no_meio():
+    """Rodada mista não é comparável com nenhuma das duas, e o relatório
+    precisa dizer isso em vez de exibir um número limpo."""
+    result = runner.invoke(
+        cli(measure_source_recall=recall_report(ranking="misto")), ["check-sources"]
+    )
+
+    assert "ordenadas por misto" in result.stdout
+    assert "degradou no meio da rodada" in result.stdout

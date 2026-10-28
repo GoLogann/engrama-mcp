@@ -3,19 +3,13 @@ from collections.abc import Collection
 
 from engrama.application.dto.ingestion import CodeFacts, RepositorySpec
 from engrama.application.ports.sources import CodeExtractor, SourceTree
+from engrama.domain.services import IssueCitationReader
 from engrama.domain.value_objects import Evidence
 from engrama.domain.value_objects.code_facts import IssueReference
 from engrama.infrastructure.extractors.base import TEST_DIRS, module_of
 
 _CODE_SUFFIXES = (".py", ".go", ".ts", ".tsx", ".js", ".dart")
-_NUMBER_LIST = r"#(?P<first>\d+)(?P<rest>(?:\s*(?:,|/|\be\b|\band\b)\s*#\d+)*)"
 _COMMENT_MARKER = re.compile(r"^\s*(?://+|/?\*+|#+)\s?")
-# "issue #5 do backend": o repo do servidor nao esta no texto, esta em `consumes`.
-_BACKEND = re.compile(r"^\s*(?:do|no|da)\s+(?:back-?end|servidor)\b", re.IGNORECASE)
-
-
-def _numbers(match: re.Match[str]) -> list[int]:
-    return [int(n) for n in (match.group("first"), *re.findall(r"#(\d+)", match.group("rest")))]
 
 
 def _comment_text(line: str) -> str:
@@ -26,26 +20,16 @@ def _comment_text(line: str) -> str:
 
 
 class IssueReferenceExtractor(CodeExtractor):
-    """Citacoes a issues em codigo: `issue #7`, `issues #12 e #13` (do proprio
-    repo) e `phishforge-api #5 e #6` (de outro repo do catalogo). Um `#7`
-    solto nao conta: e ambiguo demais.
+    """Prende as citacoes de issue encontradas no codigo ao modulo do arquivo.
 
-    `issue #N` vale para o repo do arquivo, a menos que logo depois (na mesma
-    linha ou na linha de comentario seguinte) venha um qualificador:
-    `do repo <nome>` / `do <nome>` aponta para esse repo do catalogo, e
-    `do backend` aponta para o unico repo em `consumes`. Se houver zero ou
-    varios, a citacao e ignorada e a extracao registra um diagnostico: gravar
-    no repo errado, com confianca alta, seria pior que nao gravar.
+    A leitura em si e do `IssueCitationReader` (dominio), compartilhada com a
+    extracao de documentos: as duas reconhecem as mesmas formas e so diferem
+    em onde a citacao e pendurada. Aqui, "logo depois" significa a proxima
+    linha de *comentario* — codigo nao continua uma frase.
     """
 
     def __init__(self, known_repos: Collection[str]) -> None:
-        names = "|".join(re.escape(n) for n in sorted(known_repos, key=len, reverse=True))
-        self._canonical = {name.lower(): name for name in known_repos}
-        self._same_repo = re.compile(rf"(?i)\bissues?\s*{_NUMBER_LIST}")
-        self._other_repo = re.compile(rf"(?<![\w/-])(?P<repo>{names})\s*{_NUMBER_LIST}")
-        self._named_after = re.compile(
-            rf"(?i)^\s*(?:do|no)\s+(?:repo(?:sit[óo]rio)?\s+)?(?P<repo>{names})\b"
-        )
+        self._reader = IssueCitationReader(known_repos)
 
     def supports(self, spec: RepositorySpec) -> bool:
         return True
@@ -58,38 +42,20 @@ class IssueReferenceExtractor(CodeExtractor):
             lines = tree.read(path).splitlines()
             for number, line in enumerate(lines, start=1):
                 following = _comment_text(lines[number]) if number < len(lines) else ""
+                report = self._reader.read(
+                    line, following, own_repo=repo.name, consumes=spec.consumes
+                )
                 evidence = Evidence.in_code(repo.name, path, repo.commit, number)
-                found, unresolved = self._references(line, following, spec)
                 references += [
-                    IssueReference(repo.name, module_of(path), issue_repo, issue, evidence)
-                    for issue_repo, issue in found
+                    IssueReference(
+                        repo.name, module_of(path), citation.repo, citation.number, evidence
+                    )
+                    for citation in report.found
                 ]
                 diagnostics += [
-                    f"{repo.name}/{path}:{number}: issue #{issue} 'do backend' sem como resolver "
-                    f"({len(spec.consumes)} repos em consumes); citacao ignorada"
-                    for issue in unresolved
+                    f"{repo.name}/{path}:{number}: issue #{issue} citada como de outro repo, "
+                    f"sem como resolver qual ({len(spec.consumes)} repos em consumes); "
+                    f"citacao ignorada em vez de atribuida a {repo.name}"
+                    for issue in report.unresolved
                 ]
         return CodeFacts(issues=tuple(dict.fromkeys(references)), diagnostics=tuple(diagnostics))
-
-    def _references(
-        self, line: str, following: str, spec: RepositorySpec
-    ) -> tuple[list[tuple[str, int]], list[int]]:
-        found: list[tuple[str, int]] = []
-        unresolved: list[int] = []
-        for match in self._same_repo.finditer(line):
-            tail = f"{line[match.end() :]} {following}"
-            target = self._target(tail, spec)
-            if target is None:
-                unresolved += _numbers(match)
-            else:
-                found += [(target, n) for n in _numbers(match)]
-        for match in self._other_repo.finditer(line):
-            found += [(match.group("repo"), n) for n in _numbers(match)]
-        return found, unresolved
-
-    def _target(self, tail: str, spec: RepositorySpec) -> str | None:
-        if named := self._named_after.match(tail):
-            return self._canonical[named.group("repo").lower()]
-        if _BACKEND.match(tail):
-            return spec.consumes[0] if len(spec.consumes) == 1 else None
-        return spec.repo.name

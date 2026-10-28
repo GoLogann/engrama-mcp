@@ -10,7 +10,7 @@ from engrama.application.dto.evaluation import SourceRecallReport
 from engrama.application.dto.ingestion import IngestionReport
 from engrama.application.dto.knowledge import ChunkHit
 from engrama.application.dto.structure_check import StructureCheckReport
-from engrama.application.ports.knowledge import BY_WORD
+from engrama.application.ports.knowledge import BY_MIXED, BY_WORD
 from engrama.application.use_cases.build_structural_graph import BuildStructuralGraph
 from engrama.application.use_cases.check_structure import CheckStructureAgainstGroundTruth
 from engrama.application.use_cases.index_documents import IndexDocuments
@@ -126,7 +126,7 @@ def _print_indexing(report: IndexingReport) -> None:
         typer.echo(
             f"{repo.repo}: {repo.documents} documentos, {repo.decisions} decisões, "
             f"{repo.chunks} pedaços, {repo.endpoints_documented} endpoints documentados, "
-            f"{repo.redactions} valores mascarados"
+            f"{repo.issues} issues citadas, {repo.redactions} valores mascarados"
         )
     chunks = sum(repo.chunks for repo in report.repos)
     typer.echo(f"\nPedaços com vetor: {report.vectors} de {chunks}")
@@ -169,6 +169,11 @@ def _print_recall(report: SourceRecallReport) -> None:
         typer.echo(
             "  Reserva por palavra: sem embeddings a busca acha menos fontes. "
             "Defina VOYAGE_API_KEY para medir a busca que o projeto usa de verdade."
+        )
+    elif report.ranking == BY_MIXED:
+        typer.echo(
+            "  A busca degradou no meio da rodada (teto de taxa): parte das perguntas "
+            "foi por vetor e parte pela reserva. Rode de novo para um número comparável."
         )
     typer.echo(
         f"Arquivo certo na lista: {report.found}/{measured} "

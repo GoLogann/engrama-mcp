@@ -22,3 +22,5 @@ O doc de fundamentação lista a aresta `REFERENCES_ISSUE` sem dizer para que n�
 ## Consequências
 
 - As origens de `DOCUMENTED_IN`, `MENTIONS_CONCEPT` e `ABOUT` são interpretação do autor e precisam ser validadas quando as Fases 2 e 3 criarem essas arestas. Uma síntese gerada por LLM na reflexão semanal, por exemplo, não cabe hoje como `Episode`.
+
+  *Revalidação de 28/10/2026:* `DOCUMENTED_IN` passou a existir de verdade (ADR 0010) e a regra se sustentou — as duas formas que a extração cria (o `README.md` da raiz documenta o repo; uma rota citada no texto documenta aquele endpoint) usam `extraction`, e as formas que exigiriam interpretação ficaram de fora à espera do LLM, exatamente como a origem `llm` previa. `MENTIONS_CONCEPT` e `ABOUT` continuam sem nenhuma aresta no grafo, então seguem como interpretação não validada; a dúvida sobre a síntese de reflexão permanece aberta para a Fase 3.

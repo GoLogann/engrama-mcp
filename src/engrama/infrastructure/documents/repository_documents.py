@@ -5,11 +5,20 @@ from engrama.application.dto.documentation import DocumentFacts
 from engrama.application.dto.ingestion import RepositorySpec
 from engrama.application.ports.sources import DocumentExtractor, SourceTree
 from engrama.domain.errors import InvalidRoute
-from engrama.domain.services import RouteNormalizer, first_heading
+from engrama.domain.services import IssueCitationReader, RouteNormalizer, first_heading
 from engrama.domain.value_objects import Evidence
-from engrama.domain.value_objects.document_facts import DocumentFile, DocumentKind, RouteMention
+from engrama.domain.value_objects.document_facts import (
+    DocumentFile,
+    DocumentIssueCitation,
+    DocumentKind,
+    RouteMention,
+)
 
-SUFFIXES = (".md", ".config")
+# `.conf.template` precisa estar explicito: ele termina em `.template`, e nao
+# em `.conf`, e o casamento e por fim de nome. `.cfg` e `.ini` ficaram de fora
+# porque nenhum arquivo dos quatro repos usa — a regra enumera o que existe
+# (ADR 0010), e nao o que poderia existir.
+SUFFIXES = (".md", ".config", ".conf", ".conf.template")
 ROOT_FILES = ("package.json",)
 # Diretorios cujo conteudo nao e documentacao do projeto: dados de entrada
 # (`data/articles/phishing_examples.md` sao exemplos de phishing, nao docs),
@@ -57,20 +66,29 @@ class RepositoryDocumentExtractor(DocumentExtractor):
     propria decisao.
     """
 
-    def __init__(self, normalizer: RouteNormalizer) -> None:
+    def __init__(
+        self, normalizer: RouteNormalizer, citations: IssueCitationReader | None = None
+    ) -> None:
         self._normalizer = normalizer
+        # Sem leitor, nenhuma citacao de issue e extraida. O padrao e None
+        # para o extrator continuar construivel sem o catalogo em maos.
+        self._citations = citations
 
     def extract(self, tree: SourceTree, spec: RepositorySpec) -> DocumentFacts:
         documents: list[DocumentFile] = []
         mentions: list[RouteMention] = []
+        issues: list[DocumentIssueCitation] = []
         diagnostics: list[str] = []
         for path in self._paths(tree):
             text = tree.read(path)
             documents.append(self._document(spec, path, text))
             found, warnings = self._mentions(spec, path, text)
             mentions += found
+            citadas, avisos = self._issues(spec, path, text)
+            issues += citadas
+            diagnostics += avisos
             diagnostics += warnings
-        return DocumentFacts(tuple(documents), tuple(mentions), tuple(diagnostics))
+        return DocumentFacts(tuple(documents), tuple(mentions), tuple(issues), tuple(diagnostics))
 
     def _paths(self, tree: SourceTree) -> list[str]:
         paths = [
@@ -105,6 +123,49 @@ class RepositoryDocumentExtractor(DocumentExtractor):
             evidence=Evidence.in_code(spec.repo.name, path, spec.repo.commit),
             status=status,
         )
+
+    def _issues(
+        self, spec: RepositorySpec, path: str, text: str
+    ) -> tuple[list[DocumentIssueCitation], list[str]]:
+        """Citacoes a issue no texto de um documento.
+
+        Em Markdown um paragrafo se quebra em varias linhas, entao "logo
+        depois" e a linha seguinte — a menos que esteja em branco, que encerra
+        o paragrafo. Em codigo o critério e outro (so comentario continua), e e
+        por isso que quem chama decide, nao o `IssueCitationReader`.
+        """
+        if self._citations is None:
+            return [], []
+        found: dict[tuple[str, int], DocumentIssueCitation] = {}
+        diagnostics: list[str] = []
+        lines = text.splitlines()
+        for number, line in enumerate(lines, start=1):
+            seguinte = lines[number] if number < len(lines) else ""
+            report = self._citations.read(
+                line,
+                "" if not seguinte.strip() else seguinte,
+                own_repo=spec.repo.name,
+                consumes=spec.consumes,
+            )
+            evidence = Evidence.in_code(spec.repo.name, path, spec.repo.commit, number)
+            for citation in report.found:
+                found.setdefault(
+                    (citation.repo, citation.number),
+                    DocumentIssueCitation(
+                        repo=spec.repo.name,
+                        path=path,
+                        issue_repo=citation.repo,
+                        number=citation.number,
+                        evidence=evidence,
+                    ),
+                )
+            diagnostics += [
+                f"{spec.repo.name}/{path}:{number}: issue #{issue} citada como de outro repo, "
+                f"sem como resolver qual; citacao ignorada em vez de atribuida a "
+                f"{spec.repo.name}"
+                for issue in report.unresolved
+            ]
+        return list(found.values()), diagnostics
 
     def _mentions(
         self, spec: RepositorySpec, path: str, text: str

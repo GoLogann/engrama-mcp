@@ -2,16 +2,21 @@ from dependency_injector import containers, providers
 
 from engrama.application.use_cases.build_structural_graph import BuildStructuralGraph
 from engrama.application.use_cases.check_structure import CheckStructureAgainstGroundTruth
+from engrama.application.use_cases.explain_connection import ExplainConnection
+from engrama.application.use_cases.find_usages import AnalyzeImpact, FindUsages
+from engrama.application.use_cases.get_project_overview import FindNode, GetProjectOverview
 from engrama.application.use_cases.index_documents import IndexDocuments
 from engrama.application.use_cases.ingest_repository import IngestRepository
 from engrama.application.use_cases.link_calls_to_routes import LinkCallsToRoutes
 from engrama.application.use_cases.measure_source_recall import MeasureSourceRecall
 from engrama.application.use_cases.read_repository_documents import ReadRepositoryDocuments
+from engrama.application.use_cases.resolve_node import ResolveNode
 from engrama.application.use_cases.search_knowledge import SearchKnowledge
 from engrama.bootstrap.settings import Settings
 from engrama.domain.services import (
     DocumentationGraphBuilder,
     DocumentChunker,
+    IssueCitationReader,
     RouteMentionMatcher,
     RouteNormalizer,
     StructuralGraphBuilder,
@@ -31,6 +36,7 @@ from engrama.infrastructure.extractors import (
 )
 from engrama.infrastructure.git.git_source_repository import GitSourceRepository
 from engrama.infrastructure.neo4j.connection import open_driver
+from engrama.infrastructure.neo4j.graph_reader import Neo4jGraphReader
 from engrama.infrastructure.neo4j.graph_writer import Neo4jGraphWriter
 from engrama.infrastructure.neo4j.knowledge_index import Neo4jKnowledgeIndex
 from engrama.infrastructure.neo4j.structure_reader import Neo4jStructureReader
@@ -90,7 +96,12 @@ class Container(containers.DeclarativeContainer):
         providers.Singleton(ComposeExtractor),
         providers.Singleton(IssueReferenceExtractor, catalog.provided.load.call().repo_names),
     )
-    document_extractor = providers.Singleton(RepositoryDocumentExtractor, route_normalizer)
+    issue_citations = providers.Singleton(
+        IssueCitationReader, catalog.provided.load.call().repo_names
+    )
+    document_extractor = providers.Singleton(
+        RepositoryDocumentExtractor, route_normalizer, issue_citations
+    )
 
     embedder = providers.Singleton(
         embedder_or_none,
@@ -100,6 +111,9 @@ class Container(containers.DeclarativeContainer):
     )
 
     graph_writer = providers.Singleton(Neo4jGraphWriter, neo4j_driver)
+    # Leitura separada da escrita: um handler de tool recebe graph_reader e
+    # nao tem como escrever no grafo nem por engano (ISP + DIP).
+    graph_reader = providers.Singleton(Neo4jGraphReader, neo4j_driver)
     structure_reader = providers.Singleton(Neo4jStructureReader, neo4j_driver)
     vector_store = providers.Singleton(Neo4jVectorStore, neo4j_driver)
     knowledge_index = providers.Singleton(Neo4jKnowledgeIndex, neo4j_driver, embedder)
@@ -138,3 +152,11 @@ class Container(containers.DeclarativeContainer):
     measure_source_recall = providers.Factory(
         MeasureSourceRecall, golden_questions, knowledge_index
     )
+    # Tools de leitura do MCP (Fase 4). Nenhuma precisa de LLM nem de
+    # embedding: sao consultas ao grafo com a evidencia de cada aresta.
+    resolve_node = providers.Factory(ResolveNode, graph_reader)
+    find_node = providers.Factory(FindNode, graph_reader)
+    find_usages = providers.Factory(FindUsages, graph_reader, resolve_node)
+    analyze_impact = providers.Factory(AnalyzeImpact, graph_reader, resolve_node)
+    explain_connection = providers.Factory(ExplainConnection, graph_reader, resolve_node)
+    project_overview = providers.Factory(GetProjectOverview, graph_reader)

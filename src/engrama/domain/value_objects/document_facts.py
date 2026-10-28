@@ -45,3 +45,20 @@ class RouteMention:
     path: str
     route: HttpRoute
     evidence: Evidence
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentIssueCitation:
+    """Issue citada no texto de um documento (`issue #38 do repo X`).
+
+    Irma de `IssueReference` (code_facts), que prende a citacao a um modulo.
+    Sao duas porque o que cita e diferente: aqui e um `Doc` ou `Decision`,
+    identificado pelo caminho do arquivo. A leitura do texto e a mesma, no
+    `IssueCitationReader`; so a fixacao difere.
+    """
+
+    repo: str
+    path: str
+    issue_repo: str
+    number: int
+    evidence: Evidence
