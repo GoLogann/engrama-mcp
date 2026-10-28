@@ -2,6 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
 
+from engrama.application.dto.consulta import (
+    Connection,
+    Direction,
+    NodeSummary,
+    ProjectOverview,
+)
 from engrama.application.dto.structure_check import (
     CallFact,
     DataStoreFact,
@@ -10,6 +16,7 @@ from engrama.application.dto.structure_check import (
 )
 from engrama.domain.entities import Endpoint
 from engrama.domain.services import RepositoryGraph
+from engrama.domain.value_objects import NodeRef
 
 
 class GraphWriter(ABC):
@@ -46,6 +53,37 @@ class StructureReader(ABC):
         endpoint que esta aqui: assim a aresta nunca aponta para um no que
         nao existe no grafo.
         """
+
+
+class GraphReader(ABC):
+    """Leitura do grafo para as tools do MCP.
+
+    Separada do `GraphWriter` por construcao (segregacao de interfaces): um
+    handler de tool recebe esta porta e nao tem como escrever no grafo, nem
+    por engano. So le o que vale hoje — arestas com `open: true` (ADR 0009).
+    """
+
+    @abstractmethod
+    def find(self, text: str, limit: int = 10) -> list[NodeSummary]:
+        """Nos cujo nome, caminho ou rota casa com o texto, do mais para o
+        menos parecido. Texto vazio devolve lista vazia."""
+
+    @abstractmethod
+    def node(self, ref: NodeRef) -> NodeSummary | None:
+        """O no, ou `None` se ele nao existe no grafo."""
+
+    @abstractmethod
+    def edges(self, ref: NodeRef, direction: Direction) -> list[Connection]:
+        """As arestas abertas em volta do no, com a evidencia de cada uma."""
+
+    @abstractmethod
+    def path(self, origin: NodeRef, target: NodeRef, max_depth: int = 6) -> list[Connection]:
+        """O caminho mais curto entre dois nos, ou lista vazia se nao ha um
+        dentro de `max_depth`. Nao achar caminho e resposta, nao erro."""
+
+    @abstractmethod
+    def overview(self, project: str) -> ProjectOverview | None:
+        """O retrato estrutural de um projeto, ou `None` se ele nao existe."""
 
 
 class GroundTruthSource(ABC):
