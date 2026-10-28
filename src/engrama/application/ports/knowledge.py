@@ -6,6 +6,22 @@ from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
 
 Vector = tuple[float, ...]
 
+# Os valores que `KnowledgeIndex.ranking()` pode devolver. Ficam na porta, e
+# nao no adapter, porque fazem parte do contrato: quem le o relatorio precisa
+# do mesmo vocabulario, seja o indice do Neo4j ou um fake.
+BY_VECTOR = "vetor"
+BY_WORD = "palavra"
+
+
+class EmbeddingUnavailable(Exception):
+    """O provedor de embeddings nao respondeu e nao vai responder agora.
+
+    Existe para a busca nao precisar conhecer o provedor: quem implementa a
+    porta traduz o erro dele (teto de taxa esgotado, servico fora) para isto.
+    Erro de configuracao — chave errada, modelo inexistente — nao e isto, e
+    deve subir como veio, porque a saida e consertar, nao responder pior.
+    """
+
 
 class Embedder(ABC):
     """Transforma texto em vetor, para a metade vetorial da busca.
@@ -55,10 +71,17 @@ class KnowledgeIndex(ABC):
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
         """Os pedacos mais parecidos com a pergunta, do mais para o menos.
 
-        A busca e hibrida: a metade por palavra e a vetorial rodam e os dois
-        resultados se juntam por RRF. Quem chama nao sabe disso, e por isso a
-        assinatura nao mudou quando a parte vetorial entrou. Consulta vazia
-        devolve lista vazia.
+        O ranking e por significado quando ha embeddings, e por palavra
+        quando nao ha (ADR 0011). Consulta vazia devolve lista vazia.
+        """
+
+    @abstractmethod
+    def ranking(self) -> str:
+        """Como esta busca ordena hoje: `vetor` ou `palavra`.
+
+        Faz parte do contrato porque a reserva por palavra responde pior, e
+        um relatorio que nao diz qual motor respondeu afirma um numero sobre
+        o outro. Medicao sem essa informacao nao e medicao.
         """
 
     @abstractmethod

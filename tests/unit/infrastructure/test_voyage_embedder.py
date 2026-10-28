@@ -9,6 +9,7 @@ check-sources`, com o corpus de verdade.
 
 import pytest
 
+from engrama.application.ports.knowledge import EmbeddingUnavailable
 from engrama.infrastructure.embeddings import voyage_embedder
 from engrama.infrastructure.embeddings.voyage_embedder import VoyageEmbedder
 
@@ -91,7 +92,7 @@ def test_teto_de_taxa_espera_e_tenta_de_novo(stub, monkeypatch):
     assert esperas == [25.0], "esperou antes de tentar de novo"
 
 
-def test_teto_de_taxa_que_nao_passa_deixa_o_erro_subir(stub, monkeypatch):
+def test_teto_de_taxa_que_nao_passa_vira_EmbeddingUnavailable(stub, monkeypatch):
     monkeypatch.setattr(voyage_embedder.time, "sleep", lambda _seconds: None)
 
     def sempre_recusa(*_args, **_kwargs):
@@ -99,7 +100,9 @@ def test_teto_de_taxa_que_nao_passa_deixa_o_erro_subir(stub, monkeypatch):
 
     monkeypatch.setattr(stub, "embed", sempre_recusa)
 
-    with pytest.raises(voyage_embedder.voyageai.error.RateLimitError):
+    # Traduzido, nao repassado: a busca cai para a reserva por palavra sem
+    # conhecer a Voyage, e erro de configuracao continua subindo cru.
+    with pytest.raises(EmbeddingUnavailable, match="teto de taxa"):
         VoyageEmbedder(api_key="al-x").embed_documents(["um texto"])
 
 

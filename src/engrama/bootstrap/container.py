@@ -12,7 +12,6 @@ from engrama.bootstrap.settings import Settings
 from engrama.domain.services import (
     DocumentationGraphBuilder,
     DocumentChunker,
-    ReciprocalRankFusion,
     RouteMentionMatcher,
     RouteNormalizer,
     StructuralGraphBuilder,
@@ -38,6 +37,17 @@ from engrama.infrastructure.neo4j.structure_reader import Neo4jStructureReader
 from engrama.infrastructure.neo4j.vector_store import Neo4jVectorStore
 from engrama.infrastructure.security.secret_scanner import RegexSecretScanner
 from engrama.infrastructure.system.clock import SystemClock
+
+
+def embedder_or_none(api_key: str, model: str, dimensions: int) -> VoyageEmbedder | None:
+    """O embedder, ou `None` quando nao ha chave configurada.
+
+    Sem chave o projeto continua rodando com a reserva por palavra (ADR
+    0011), que acha menos fontes. Quem decide isso e a raiz de composicao, e
+    nao o adapter: o `VoyageEmbedder` recusa chave vazia de proposito, para
+    ninguem construir um embedder que nao embute.
+    """
+    return VoyageEmbedder(api_key, model, dimensions) if api_key else None
 
 
 class Container(containers.DeclarativeContainer):
@@ -82,9 +92,8 @@ class Container(containers.DeclarativeContainer):
     )
     document_extractor = providers.Singleton(RepositoryDocumentExtractor, route_normalizer)
 
-    rank_fusion = providers.Singleton(ReciprocalRankFusion)
     embedder = providers.Singleton(
-        VoyageEmbedder,
+        embedder_or_none,
         settings.provided.voyage_api_key.get_secret_value.call(),
         settings.provided.embedding_model,
         settings.provided.embedding_dimensions,
@@ -93,7 +102,7 @@ class Container(containers.DeclarativeContainer):
     graph_writer = providers.Singleton(Neo4jGraphWriter, neo4j_driver)
     structure_reader = providers.Singleton(Neo4jStructureReader, neo4j_driver)
     vector_store = providers.Singleton(Neo4jVectorStore, neo4j_driver)
-    knowledge_index = providers.Singleton(Neo4jKnowledgeIndex, neo4j_driver, embedder, rank_fusion)
+    knowledge_index = providers.Singleton(Neo4jKnowledgeIndex, neo4j_driver, embedder)
 
     ingest_repository = providers.Factory(IngestRepository, source_repository, extractors)
     link_calls_to_routes = providers.Factory(LinkCallsToRoutes, graph_builder)

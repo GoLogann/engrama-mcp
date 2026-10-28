@@ -5,9 +5,15 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
-from engrama.application.ports.knowledge import Embedder, KnowledgeIndex, Vector, VectorStore
+from engrama.application.ports.knowledge import (
+    BY_VECTOR,
+    BY_WORD,
+    Embedder,
+    KnowledgeIndex,
+    Vector,
+    VectorStore,
+)
 from engrama.domain.entities import Chunk, EdgeKind
-from engrama.domain.services import ReciprocalRankFusion
 from engrama.domain.value_objects import NodeKind
 from tests.fakes.graph import InMemoryGraph
 
@@ -73,50 +79,48 @@ class InMemoryVectorStore(VectorStore):
 
 
 class InMemoryKnowledgeIndex(KnowledgeIndex):
-    """Busca hibrida sobre o grafo em memoria.
+    """Busca sobre o grafo em memoria, pelos mesmos dois caminhos do Neo4j.
 
-    Espelha o adapter do Neo4j de proposito: duas metades (palavra em comum e
-    cosseno) e fusao por RRF. Sem isso o contrato deixaria de ser
-    compartilhado — o fake garantiria "palavra inexistente nao traz nada", que
-    e propriedade de busca lexical e nenhuma busca vetorial tem.
+    Espelha o adapter real de proposito: ranqueia por cosseno quando ha
+    embedder e por palavra em comum quando nao ha. Sem isso o contrato
+    deixaria de ser compartilhado — o fake garantiria "palavra inexistente
+    nao traz nada", que e propriedade de busca lexical e nenhuma busca
+    vetorial tem.
 
     A nota nao e a do Lucene (nao tem BM25 nem radical), entao o contrato so
     cobra o que os dois garantem: ordem por nota, limite e o que entra.
     """
 
-    def __init__(
-        self,
-        graph: InMemoryGraph,
-        embedder: Embedder | None = None,
-        fusion: ReciprocalRankFusion | None = None,
-    ) -> None:
+    def __init__(self, graph: InMemoryGraph, embedder: Embedder | None = None) -> None:
         self._graph = graph
-        self._embedder = embedder or FakeEmbedder()
-        self._fusion = fusion or ReciprocalRankFusion()
+        self._embedder = embedder
+
+    def ranking(self) -> str:
+        return BY_WORD if self._embedder is None else BY_VECTOR
 
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
         terms = {word.lower() for word in _WORDS.findall(query)}
         if not terms or limit < 1:
             return []
-        rows = {chunk.key: found for found in self._chunks() for chunk in [found[0]]}
+        rows = {found[0].key: found for found in self._chunks()}
 
-        lexical = []
-        for key, (chunk, _document, _at) in rows.items():
-            words = {word.lower() for word in _WORDS.findall(f"{chunk.text} {chunk.heading}")}
-            score = len(terms & words)
-            if score:
-                lexical.append((score, key))
-        ranked_lexical = [key for _score, key in sorted(lexical, key=lambda i: (-i[0], i[1]))]
+        if self._embedder is None:
+            asked = None
+            scored = []
+            for key, (chunk, _document, _at) in rows.items():
+                words = {word.lower() for word in _WORDS.findall(f"{chunk.text} {chunk.heading}")}
+                score = len(terms & words)
+                if score:
+                    scored.append((float(score), key))
+        else:
+            asked = self._embedder.embed_query(query)
+            scored = [
+                (_cosine(asked, self._embedder.embed_documents([chunk.text])[0]), key)
+                for key, (chunk, _document, _at) in rows.items()
+            ]
 
-        asked = self._embedder.embed_query(query)
-        similar = [
-            (_cosine(asked, self._embedder.embed_documents([chunk.text])[0]), key)
-            for key, (chunk, _document, _at) in rows.items()
-        ]
-        ranked_vector = [key for _score, key in sorted(similar, key=lambda i: (-i[0], i[1]))]
-
-        fused = self._fusion.fuse(ranked_lexical, ranked_vector)
-        return [self._hit(rows[item.key], item.score) for item in fused[:limit]]
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [self._hit(rows[key], score) for score, key in scored[:limit]]
 
     def documents(self) -> list[IndexedDocument]:
         chunks: dict[str, int] = {}

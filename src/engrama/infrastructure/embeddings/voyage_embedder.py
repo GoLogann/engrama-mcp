@@ -5,7 +5,7 @@ from collections.abc import Iterator, Sequence
 import voyageai
 import voyageai.error
 
-from engrama.application.ports.knowledge import Embedder, Vector
+from engrama.application.ports.knowledge import Embedder, EmbeddingUnavailable, Vector
 
 logger = logging.getLogger(__name__)
 
@@ -82,15 +82,16 @@ class VoyageEmbedder(Embedder):
 
         Espera em vez de desistir porque indexar e trabalho de lote: perder a
         rodada inteira por causa de um teto por minuto obrigaria a refazer o
-        que ja foi embutido. A ultima tentativa deixa o erro subir, para a
-        falha nunca passar em silencio.
+        que ja foi embutido. Esgotadas as esperas, o erro do provedor e
+        traduzido para `EmbeddingUnavailable`, que e o que a busca entende
+        sem conhecer a Voyage.
         """
         for wait in (*_RATE_LIMIT_WAITS, None):
             try:
                 return self._client.embed(list(texts), model=self._model, input_type=input_type)
-            except voyageai.error.RateLimitError:
+            except voyageai.error.RateLimitError as error:
                 if wait is None:
-                    raise
+                    raise EmbeddingUnavailable(f"teto de taxa da Voyage: {error}") from error
                 logger.warning("Teto de taxa da Voyage: esperando %.0fs para tentar de novo", wait)
                 time.sleep(wait)
         raise AssertionError("inalcancavel: a ultima tentativa levanta ou devolve")

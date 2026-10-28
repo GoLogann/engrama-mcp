@@ -1,15 +1,15 @@
 """Contrato de KnowledgeIndex.
 
-A mesma suite roda contra o indice em memoria e contra o indice hibrido do
-Neo4j. As notas dos dois nao sao iguais (so o Neo4j tem BM25, radical de
-palavra e embedding de verdade), entao o contrato cobra o que os dois precisam
-garantir: ordem decrescente de nota, limite respeitado, consulta vazia sem
-resultado e so pedaco de documento que ainda vale.
+A mesma suite roda contra o indice em memoria e contra o do Neo4j. As notas
+dos dois nao sao iguais (so o Neo4j tem BM25, radical de palavra e embedding
+de verdade), entao o contrato cobra o que os dois precisam garantir: ordem
+decrescente de nota, limite respeitado, consulta vazia sem resultado, so
+pedaco de documento que ainda vale, e dizer por qual motor ordenou.
 
 Os dois lados usam o `FakeEmbedder` — tambem o backend do Neo4j, de proposito.
 Medir a qualidade da Voyage e trabalho de `engrama check-sources`, com o corpus
-de verdade; aqui o que se testa e a mecanica da busca hibrida, e ela precisa
-rodar no CI sem chave de API nenhuma.
+de verdade; aqui o que se testa e a mecanica da busca, e ela precisa rodar no
+CI sem chave de API nenhuma.
 
 Os testes no Neo4j usam chaves com o prefixo `contract-` e as apagam no fim;
 sem Neo4j acessivel, sao pulados.
@@ -22,7 +22,13 @@ from datetime import UTC, datetime
 import pytest
 
 from engrama.application.ports.graph import GraphWriter
-from engrama.application.ports.knowledge import Embedder, KnowledgeIndex, VectorStore
+from engrama.application.ports.knowledge import (
+    BY_VECTOR,
+    BY_WORD,
+    Embedder,
+    KnowledgeIndex,
+    VectorStore,
+)
 from engrama.domain.entities import Chunk, Repo, Stack
 from engrama.domain.services import DocumentationGraphBuilder, DocumentChunker, MentionReport
 from engrama.domain.value_objects import Evidence, Validity
@@ -68,6 +74,8 @@ class Backend:
     writer: GraphWriter
     index: KnowledgeIndex
     vectors: VectorStore
+    # A mesma base, sem embedder: a reserva por palavra do ADR 0011.
+    reserve: KnowledgeIndex = None  # type: ignore[assignment]
     embedder: Embedder = field(default_factory=FakeEmbedder)
     settle: Callable[[], None] = lambda: None
 
@@ -101,6 +109,7 @@ def backend(request):
             writer=fake,
             index=InMemoryKnowledgeIndex(fake, embedder),
             vectors=InMemoryVectorStore(fake),
+            reserve=InMemoryKnowledgeIndex(fake),
             embedder=embedder,
         )
         return
@@ -136,6 +145,7 @@ def backend(request):
         writer=writer,
         index=Neo4jKnowledgeIndex(driver, embedder),
         vectors=Neo4jVectorStore(driver),
+        reserve=Neo4jKnowledgeIndex(driver),
         embedder=embedder,
         settle=settle,
     )
@@ -187,7 +197,7 @@ def test_consulta_sem_palavra_nao_devolve_nada(backend):
 
 
 def test_palavra_que_nao_esta_em_documento_nenhum_ainda_traz_vizinhos(backend):
-    """Consequencia da busca hibrida, registrada de proposito (ADR 0011).
+    """Consequencia da busca por significado, registrada de proposito (ADR 0011).
 
     Busca vetorial nao tem a nocao de "nao achei": ela devolve sempre os k
     mais proximos. Entao uma palavra que nao esta em documento nenhum deixa de
@@ -198,8 +208,7 @@ def test_palavra_que_nao_esta_em_documento_nenhum_ainda_traz_vizinhos(backend):
 
     found = hits(backend, "paralelepipedo")
 
-    assert found, "a metade vetorial sempre tem um vizinho mais proximo"
-    assert all(hit.score > 0 for hit in found)
+    assert found, "a busca vetorial sempre tem um vizinho mais proximo"
 
 
 def test_documento_removido_do_repo_sai_da_busca(backend):
@@ -241,3 +250,18 @@ def test_hit_diz_quando_o_grafo_soube_do_pedaco(backend):
     found = hits(backend, "fuso horario")
 
     assert found[0].ingested_at == T0
+
+
+def test_diz_por_qual_motor_ordena(backend):
+    assert backend.index.ranking() == BY_VECTOR
+    assert backend.reserve.ranking() == BY_WORD
+
+
+def test_a_reserva_por_palavra_responde_sem_embeddings(backend):
+    """Sem chave de API a busca cai para palavra (ADR 0011). Ela acha menos,
+    mas precisa achar: e o modo de quem so quer rodar o projeto."""
+    backend.write([README, DECISION], run_id="k1")
+
+    found = [hit for hit in backend.reserve.search("fuso horario", 10) if hit.repo == REPO.name]
+
+    assert [hit.path for hit in found] == [DECISION.path]

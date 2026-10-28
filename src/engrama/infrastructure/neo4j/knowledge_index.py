@@ -1,18 +1,21 @@
+import logging
 import re
 
 from neo4j import Driver
 
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
-from engrama.application.ports.knowledge import Embedder, KnowledgeIndex
-from engrama.domain.services import ReciprocalRankFusion
+from engrama.application.ports.knowledge import (
+    BY_VECTOR,
+    BY_WORD,
+    Embedder,
+    EmbeddingUnavailable,
+    KnowledgeIndex,
+)
+
+logger = logging.getLogger(__name__)
 
 CHUNK_INDEX = "chunk_text"
 VECTOR_INDEX = "chunk_embedding"
-
-# Quantos candidatos cada metade traz antes da fusao. Mais fundo que o `limit`
-# pedido de proposito: um pedaco em 30o lugar na busca por palavra e em 2o na
-# vetorial precisa estar nas duas listas para o RRF poder somar as posicoes.
-_CANDIDATES = 50
 
 # A consulta vai para o Lucene, que trata `/`, `?`, `:` e `-` como sintaxe. A
 # pergunta e reduzida as palavras (e assim que o analisador quebra o texto
@@ -22,8 +25,8 @@ _CANDIDATES = 50
 _WORDS = re.compile(r"\w+", re.UNICODE)
 
 # Documento com a aresta PART_OF aberta: o que vale hoje (ADR 0009). As duas
-# metades da busca projetam as mesmas colunas, para o resultado ser montado
-# por um caminho so.
+# consultas projetam as mesmas colunas, para o resultado ser montado por um
+# caminho so.
 _PROJECTION = """
 MATCH (node)-[r:PART_OF {open: true}]->(d)
 WHERE d:Doc OR d:Decision
@@ -33,7 +36,7 @@ RETURN node.key AS key, node.repo AS repo, node.path AS path,
        d.title AS title, labels(d)[0] AS kind, r.ingested_at AS ingested_at,
        score AS score
 ORDER BY score DESC, repo, path, first_line
-LIMIT $candidates
+LIMIT $limit
 """
 
 _LEXICAL = f"""
@@ -42,7 +45,7 @@ CALL db.index.fulltext.queryNodes('{CHUNK_INDEX}', $query) YIELD node, score
 """
 
 _VECTOR = f"""
-CALL db.index.vector.queryNodes('{VECTOR_INDEX}', $candidates, $vector) YIELD node, score
+CALL db.index.vector.queryNodes('{VECTOR_INDEX}', $limit, $vector) YIELD node, score
 {_PROJECTION}
 """
 
@@ -58,46 +61,70 @@ ORDER BY repo, path
 
 
 class Neo4jKnowledgeIndex(KnowledgeIndex):
-    """Busca hibrida na camada de documentacao.
+    """Busca na camada de documentacao, por significado ou por palavra.
 
-    Duas metades independentes: o indice de texto completo, com analisador
-    portugues, e o indice vetorial. Elas acham coisas diferentes — a primeira
-    exige a palavra, a segunda entende que "migrations" e `flyway` falam do
-    mesmo assunto — e os dois resultados se juntam por RRF, que compara
-    posicao em vez de pontuacao.
+    O ranking e o indice vetorial. A metade por palavra existe como reserva,
+    nao como metade de uma fusao: medido nas fontes das perguntas de ouro, o
+    vetor acha 91% dos arquivos em k=10 contra 82% da palavra, e **ganha
+    tambem da fusao por RRF** (86%), em todo tamanho de lista testado. A
+    razao e estrutural: com as vagas divididas entre as duas listas, um
+    achado que so o vetor ve, em 6o lugar, nao cabe na saida. As medicoes
+    estao no ADR 0011.
 
-    O `score` do `ChunkHit` passa a ser a pontuacao da fusao, nao a do Lucene:
-    ela so faz sentido comparada com os outros resultados da mesma consulta.
+    Sem `embedder` a busca cai para palavra, e `ranking()` passa a dizer
+    isso. A reserva e para nao exigir chave de API de quem so quer rodar o
+    projeto; ela responde pior, e por isso nunca e escolhida em silencio.
     """
 
     def __init__(
         self,
         driver: Driver,
-        embedder: Embedder,
-        fusion: ReciprocalRankFusion | None = None,
+        embedder: Embedder | None = None,
         database: str = "neo4j",
     ) -> None:
         self._driver = driver
         self._embedder = embedder
-        self._fusion = fusion or ReciprocalRankFusion()
         self._database = database
+        self._degraded = False
+
+    def ranking(self) -> str:
+        return BY_WORD if self._embedder is None or self._degraded else BY_VECTOR
 
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
         words = _WORDS.findall(query)
         if not words or limit < 1:
             return []
-        candidates = max(limit, _CANDIDATES)
+        vector = self._embed(query)
+        if vector is None:
+            return self._lexical(words, limit)
+        rows = self._run(_VECTOR, vector=vector, limit=limit)
+        return [self._hit(row) for row in rows]
 
-        lexical = self._run(
-            _LEXICAL, query=" ".join(f'"{word}"' for word in words), candidates=candidates
-        )
-        vector = self._run(
-            _VECTOR, vector=list(self._embedder.embed_query(query)), candidates=candidates
-        )
+    def _embed(self, query: str) -> list[float] | None:
+        """O vetor da pergunta, ou `None` quando a busca cai para palavra.
 
-        rows = {**vector, **lexical}
-        fused = self._fusion.fuse(list(lexical), list(vector))
-        return [self._hit(rows[item.key], item.score) for item in fused[:limit]]
+        Provedor indisponivel nao derruba a busca, mas tambem nao passa em
+        silencio: avisa e marca a instancia como degradada, para `ranking()`
+        parar de dizer `vetor`. Qualquer outro erro sobe — chave errada ou
+        indice ausente e defeito de configuracao, nao motivo para responder
+        pior sem ninguem saber.
+        """
+        if self._embedder is None:
+            return None
+        try:
+            return list(self._embedder.embed_query(query))
+        except EmbeddingUnavailable as error:
+            self._degraded = True
+            logger.warning(
+                "Embeddings indisponiveis (%s): esta busca e as seguintes caem para busca "
+                "por palavra, que acha menos fontes (82%% contra 91%% em k=10).",
+                error,
+            )
+            return None
+
+    def _lexical(self, words: list[str], limit: int) -> list[ChunkHit]:
+        terms = " ".join(f'"{word}"' for word in words)
+        return [self._hit(row) for row in self._run(_LEXICAL, query=terms, limit=limit)]
 
     def documents(self) -> list[IndexedDocument]:
         records, _, _ = self._driver.execute_query(
@@ -114,19 +141,16 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
             for row in records
         ]
 
-    def _run(self, cypher: str, **parameters: object) -> dict[str, dict]:
-        """Roda uma das metades e devolve as linhas por chave, em ordem.
-
-        O parametro se chama `cypher`, e nao `query`: a consulta lexical passa
-        um parametro de nome `query` para o Cypher, e os dois nomes colidiam.
-        """
+    def _run(self, cypher: str, **parameters: object) -> list[dict]:
+        """O parametro se chama `cypher`, e nao `query`: a consulta lexical
+        passa um parametro de nome `query` para o Cypher, e os dois colidiam."""
         records, _, _ = self._driver.execute_query(
             cypher, database_=self._database, routing_="r", **parameters
         )
-        return {row["key"]: dict(row) for row in records}
+        return [dict(row) for row in records]
 
     @staticmethod
-    def _hit(row: dict, score: float) -> ChunkHit:
+    def _hit(row: dict) -> ChunkHit:
         return ChunkHit(
             repo=row["repo"],
             path=row["path"],
@@ -134,7 +158,7 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
             last_line=row["last_line"],
             heading=row["heading"] or "",
             text=row["text"],
-            score=score,
+            score=row["score"],
             document_title=row["title"],
             document_kind=row["kind"],
             ingested_at=row["ingested_at"].to_native(),

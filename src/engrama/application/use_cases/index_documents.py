@@ -44,7 +44,7 @@ class IndexDocuments:
         writer: GraphWriter,
         structure: StructureReader,
         clock: Clock,
-        embedder: Embedder,
+        embedder: Embedder | None,
         vectors: VectorStore,
     ) -> None:
         self._catalog = catalog
@@ -101,7 +101,13 @@ class IndexDocuments:
 
         O vetor so faz sentido para pedaco que existe no grafo: se a escrita
         falhar, nenhum vetor foi gasto, e `store` ignora chave inexistente.
+
+        Sem embedder (nao ha chave), os documentos sao indexados do mesmo
+        jeito e so a metade vetorial da busca fica sem enxergar — o relatorio
+        diz quantos pedacos ficaram sem vetor.
         """
+        if self._embedder is None:
+            return 0
         chunks = [node for graph in graphs for node in graph.nodes if isinstance(node, Chunk)]
         if not chunks:
             return 0

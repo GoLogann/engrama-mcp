@@ -2,7 +2,12 @@ from datetime import UTC, datetime
 
 from engrama.application.dto.evaluation import GoldenQuestion
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
-from engrama.application.ports.knowledge import GoldenQuestionSource, KnowledgeIndex
+from engrama.application.ports.knowledge import (
+    BY_VECTOR,
+    BY_WORD,
+    GoldenQuestionSource,
+    KnowledgeIndex,
+)
 from engrama.application.use_cases.measure_source_recall import MeasureSourceRecall
 
 
@@ -17,10 +22,19 @@ class StaticQuestions(GoldenQuestionSource):
 class StubIndex(KnowledgeIndex):
     """Indice que devolve sempre os mesmos pedacos, na ordem dada."""
 
-    def __init__(self, hits: list[ChunkHit], documents: list[IndexedDocument]):
+    def __init__(
+        self,
+        hits: list[ChunkHit],
+        documents: list[IndexedDocument],
+        ranking: str = BY_VECTOR,
+    ):
         self._hits = hits
         self._documents = documents
+        self._ranking = ranking
         self.queries: list[str] = []
+
+    def ranking(self) -> str:
+        return self._ranking
 
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
         self.queries.append(query)
@@ -164,3 +178,22 @@ def test_extensao_da_fonte_pulada_fica_disponivel_no_relatorio():
     suffixes = [item.suffix for item in recall(asked, index).skipped]
 
     assert suffixes == [".template", "(sem extensão)"]
+
+
+def test_relatorio_diz_por_qual_motor_a_busca_ordenou():
+    """Sem isso o relatorio afirmaria o numero do vetor sobre a reserva por
+    palavra, que acha menos fontes. Medicao sem o motor nao e medicao."""
+    pergunta = GoldenQuestion(
+        "n01", "nao_tecnico", "documentacao", "o que e?", ("api/README.md:3",)
+    )
+    documentos = [IndexedDocument("api", "README.md", "Doc", "t", 1)]
+
+    por_vetor = MeasureSourceRecall(
+        StaticQuestions(pergunta), StubIndex([], documentos, ranking=BY_VECTOR)
+    ).execute()
+    por_palavra = MeasureSourceRecall(
+        StaticQuestions(pergunta), StubIndex([], documentos, ranking=BY_WORD)
+    ).execute()
+
+    assert por_vetor.ranking == BY_VECTOR
+    assert por_palavra.ranking == BY_WORD
