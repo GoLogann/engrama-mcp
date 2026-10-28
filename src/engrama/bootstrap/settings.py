@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     neo4j_user: str = "neo4j"
     neo4j_password: SecretStr = SecretStr("")
 
-    llm_model: str = Field(default="claude-opus-5-5", validation_alias="ENGRAMA_LLM_MODEL")
+    # Sonnet por decisao de custo: o credito da API e pequeno, e os resumos da
+    # Fase 2 sao muitos (98 modulos). Trocar e mudar ENGRAMA_LLM_MODEL.
+    llm_model: str = Field(default="claude-sonnet-5-5", validation_alias="ENGRAMA_LLM_MODEL")
     cache_dir: Path = Field(default=Path(".cache"), validation_alias="ENGRAMA_CACHE_DIR")
     repos_config: Path = Field(
         default=Path("config/repos.yaml"), validation_alias="ENGRAMA_REPOS_CONFIG"
