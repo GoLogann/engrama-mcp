@@ -21,7 +21,7 @@ PoC em andamento. Fases e portões de qualidade em [docs/fundamentacao.md](docs/
 Requisitos: Python 3.12 ou 3.13, [Poetry](https://python-poetry.org/) 2.x e Docker.
 
 ```bash
-cp .env.example .env              # defina NEO4J_PASSWORD e VOYAGE_API_KEY
+cp .env.example .env              # defina NEO4J_PASSWORD (e VOYAGE_API_KEY, ver abaixo)
 poetry install
 docker compose up -d neo4j
 poetry run engrama ingest         # clona os 4 repos em .cache/ e grava a estrutura no Neo4j
@@ -33,13 +33,13 @@ poetry run engrama check-sources  # quanto da fonte esperada a busca encontra
 
 O grafo fica no Neo4j Browser em http://localhost:7474.
 
-### Chave de embeddings
+### Chave de embeddings (opcional, mas recomendada)
 
-`index-docs` e `search` precisam de `VOYAGE_API_KEY`, porque a busca é híbrida: metade por palavra (índice de texto completo do Neo4j, analisador português) e metade por significado (embeddings). As duas se juntam por [RRF](src/engrama/domain/services/rank_fusion.py), que compara posição em vez de pontuação.
+A busca ordena por **significado** quando há `VOYAGE_API_KEY`, e por **palavra** quando não há. Os dois modos funcionam; o primeiro acha mais: 91% das fontes esperadas pelas perguntas de ouro contra 82%, medido no [ADR 0011](docs/decisoes/0011-busca-por-significado-e-reserva-por-palavra.md). `engrama check-sources` sempre diz por qual dos dois mediu.
 
-A chave sai do MongoDB Atlas, em **AI Model APIs → Create model API key** ([documentação](https://www.mongodb.com/docs/voyageai/management/api-keys/)); não é preciso criar cluster nem ser cliente pago de banco. O corpus dos quatro repos tem cerca de 34 mil tokens, contra 200 milhões gratuitos por conta. Sem forma de pagamento cadastrada a conta fica limitada a 3 requisições e 10 mil tokens por minuto, e `index-docs` leva alguns minutos esperando esse teto.
+A chave sai do MongoDB Atlas, em **AI Model APIs → Create model API key** ([documentação](https://www.mongodb.com/docs/voyageai/management/api-keys/)); não é preciso criar cluster nem ser cliente pago de banco. O corpus dos quatro repos tem cerca de 34 mil tokens, contra 200 milhões gratuitos por conta.
 
-Sem a chave os dois comandos falham dizendo isso. É escolha deliberada: um índice sem vetor responderia pior em silêncio, e `check-sources` mediria outra coisa sem avisar.
+Sem forma de pagamento cadastrada a conta fica limitada a 3 requisições e 10 mil tokens por minuto. Nesse teto, `index-docs` leva alguns minutos e cada busca é uma chamada de rede; o adapter espera e tenta de novo em vez de falhar.
 
 ## Qualidade
 
