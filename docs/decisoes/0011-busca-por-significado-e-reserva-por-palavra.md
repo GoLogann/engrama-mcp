@@ -66,6 +66,7 @@ A hipótese que restava a favor de manter as duas metades era que as 40 pergunta
 - **Remover a metade por palavra:** chegaria aos mesmos 91% com menos código, mas tornaria a busca impossível sem chave de API e transformaria toda consulta numa chamada de rede — no teto gratuito, três por minuto.
 - **Lista de saída maior (k=20):** o vetor chega a 95% e a palavra, a 89% de linha. Não foi adotado como padrão porque ler 20 pedaços é um resultado mais fraco do que ler 10; fica disponível em `--limit`.
 - **Modelo local de embedding:** dispensaria chave e custo. Não medido, porque a chave chegou antes. Continua como saída se o acesso à Voyage se perder.
+- **Embutir `repo/caminho` e a trilha de títulos junto com o texto do pedaço:** medido em 28/10/2026 e **descartado**. A hipótese era que o vetor não sabia de que repo o pedaço era — a pergunta n12 diz "pelo site do PhishForge" e os dez primeiros resultados eram todos documentos da *API*. Com o contexto embutido, o acerto de arquivo ficou igual (23/26), as três fontes não encontradas foram exatamente as mesmas, e a cobertura de linha **piorou**, de 78% para 74%: o prefixo dilui o conteúdo do pedaço e muda qual deles é recuperado. A falha de n12 não é de contexto de repo — as palavras distintivas da pergunta ("gerar exemplos") apontam para os documentos da API, e a resposta mora na configuração do nginx do frontend. O próximo lance para essa métrica é reranking (`rerank-3` da Voyage), que pontua o par pergunta-documento em vez de comparar vetores.
 
 ## Consequências
 
