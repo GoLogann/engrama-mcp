@@ -165,3 +165,20 @@ def test_lista_os_documentos_com_o_numero_de_pedacos(backend):
     assert found[README.path].kind == "Doc"
     assert found[DECISION.path].kind == "Decision"
     assert found[EMPTY.path].chunks == 0, "documento vazio existe e nao tem pedaco"
+
+
+@pytest.mark.parametrize("query", ["NOT", "AND", "OR", "fuso OR horario", "fuso AND NOT x"])
+def test_palavra_que_e_operador_de_busca_nao_quebra(backend, query):
+    """`AND`, `OR` e `NOT` sao operadores do Lucene. Uma pergunta que traga uma
+    dessas palavras nao pode derrubar a busca: na Fase 4 isso e erro de tool."""
+    backend.writer.write(graphs([README, DECISION]), run_id="k1", at=T0)
+
+    backend.index.search(query, limit=5)
+
+
+def test_hit_diz_quando_o_grafo_soube_do_pedaco(backend):
+    backend.writer.write(graphs([README, DECISION]), run_id="k1", at=T0)
+
+    found = hits(backend, "fuso horario")
+
+    assert found[0].ingested_at == T0

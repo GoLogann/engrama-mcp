@@ -1,3 +1,4 @@
+from collections import Counter
 from collections.abc import Callable
 from importlib.metadata import version as package_version
 from typing import Annotated
@@ -152,15 +153,28 @@ def _print_hits(hits: list[ChunkHit]) -> None:
 
 
 def _print_recall(report: SourceRecallReport) -> None:
+    measured = len(report.lookups)
     typer.echo(
-        f"Fontes de documento procuradas: {len(report.lookups)} de {report.questions} perguntas "
-        f"(k={report.limit}) | fora do índice, por serem código: {len(report.skipped)}"
+        f"Fontes medidas: {measured} de {measured + len(report.skipped)}, "
+        f"em {report.questions} perguntas (k={report.limit})"
     )
     typer.echo(
-        f"Arquivo certo na lista: {report.found}/{len(report.lookups)} "
+        f"Arquivo certo na lista: {report.found}/{measured} "
         f"({report.file_recall:.0%}) | pedaço que cobre a linha citada: "
         f"{report.line_recall:.0%}"
     )
+    if report.skipped:
+        kinds = Counter(item.suffix for item in report.skipped)
+        listed = ", ".join(f"{suffix} {count}" for suffix, count in kinds.most_common())
+        typer.echo(f"\nFora do índice de documentos ({len(report.skipped)}): {listed}")
+    if report.unmeasured:
+        typer.echo(
+            f"\nPerguntas da camada de documentação sem nenhuma fonte medida "
+            f"({len(report.unmeasured)}): para elas a medida acima não diz nada."
+        )
+        for question_id in report.unmeasured:
+            for source in report.skipped_of(question_id):
+                typer.echo(f"  {question_id}: {source}")
     if report.misses:
         typer.echo(f"\nNão encontradas ({len(report.misses)}):")
         for miss in report.misses:

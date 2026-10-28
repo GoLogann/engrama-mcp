@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from engrama.application.dto.evaluation import GoldenQuestion
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
 from engrama.application.ports.knowledge import GoldenQuestionSource, KnowledgeIndex
@@ -39,6 +41,7 @@ def hit(repo, path, first_line, last_line, score=1.0):
         score=score,
         document_title="t",
         document_kind="Doc",
+        ingested_at=INGESTED_AT,
     )
 
 
@@ -50,6 +53,7 @@ def recall(asked, index, **kwargs):
     return MeasureSourceRecall(StaticQuestions(asked), index).execute(**kwargs)
 
 
+INGESTED_AT = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
 README = IndexedDocument("api", "README.md", "Doc", "API", 3)
 OUTRO = IndexedDocument("api", "docs/outro.md", "Doc", "Outro", 1)
 
@@ -91,7 +95,7 @@ def test_fonte_que_nao_e_documento_indexado_fica_de_fora():
 
     report = recall(asked, index)
 
-    assert report.skipped == ("api/app/main.py:10",)
+    assert [item.source for item in report.skipped] == ["api/app/main.py:10"]
     assert len(report.lookups) == 1
 
 
@@ -130,3 +134,33 @@ def test_limite_e_repassado_para_a_busca():
     report = recall(question("n01", ["api/README.md:5"]), index, limit=2)
 
     assert report.limit == 2
+
+
+def test_pergunta_de_documentacao_sem_fonte_medida_e_nomeada():
+    """Fonte fora do índice não é atestado de acerto: se a pergunta é da camada
+    de documentação e nenhuma fonte dela entrou na conta, a medida não diz nada
+    sobre ela, e o relatório precisa falar isso em vez de só somar 100%."""
+    index = StubIndex([hit("api", "README.md", 1, 10)], [README])
+    asked = question("t08", ["api/nginx.conf.template:14", "api/src/http.ts:2"])
+
+    report = recall(asked, index)
+
+    assert report.unmeasured == ("t08",)
+    assert report.skipped_of("t08") == ("api/nginx.conf.template:14", "api/src/http.ts:2")
+    assert report.lookups == ()
+
+
+def test_pergunta_de_outra_camada_sem_fonte_medida_nao_e_nomeada():
+    index = StubIndex([], [README])
+    asked = question("t09", ["api/app/main.py"], layer="estrutura")
+
+    assert recall(asked, index).unmeasured == ()
+
+
+def test_extensao_da_fonte_pulada_fica_disponivel_no_relatorio():
+    index = StubIndex([], [README])
+    asked = question("t08", ["api/nginx.conf.template:14", "api/Makefile"])
+
+    suffixes = [item.suffix for item in recall(asked, index).skipped]
+
+    assert suffixes == [".template", "(sem extensão)"]

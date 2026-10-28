@@ -35,6 +35,10 @@ class InMemoryGraph(GraphWriter, StructureReader):
                 self.nodes[(node.node_kind.value, node.key)] = node
         for owner, graph in graphs.items():
             for edge in graph.edges:
+                if not self._both_ends_exist(edge):
+                    # Como no Neo4j: `_UPSERT_EDGES` casa as duas pontas com
+                    # MATCH, e a linha cuja ponta nao existe nao grava nada.
+                    continue
                 current = self._open(edge)
                 if current is None:
                     self.edges.append(StoredEdge(edge, owner, run_id))
@@ -91,6 +95,9 @@ class InMemoryGraph(GraphWriter, StructureReader):
         for stored in self.open_edges(EdgeKind.CALLS):
             if stored.edge.target not in exposed:
                 stored.open, stored.valid_to = False, at
+
+    def _both_ends_exist(self, edge: Edge) -> bool:
+        return all((ref.kind.value, ref.key) in self.nodes for ref in (edge.source, edge.target))
 
     def _open(self, edge: Edge) -> StoredEdge | None:
         return next(

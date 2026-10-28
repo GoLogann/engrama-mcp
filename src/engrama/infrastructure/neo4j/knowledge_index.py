@@ -7,19 +7,21 @@ from engrama.application.ports.knowledge import KnowledgeIndex
 
 CHUNK_INDEX = "chunk_text"
 
-# A consulta vai para o Lucene, que trata `/`, `?`, `:` e `-` como sintaxe. Em
-# vez de escapar caractere por caractere, a pergunta e reduzida as palavras:
-# e assim que o analisador quebra o texto indexado tambem, entao nao se perde
-# nada, e nenhuma pontuacao da pergunta pode virar operador.
+# A consulta vai para o Lucene, que trata `/`, `?`, `:` e `-` como sintaxe. A
+# pergunta e reduzida as palavras (e assim que o analisador quebra o texto
+# indexado tambem, entao nao se perde nada) e cada palavra vai entre aspas.
+# As aspas sao o que neutraliza as palavras-operador: sem elas, uma pergunta
+# com "AND", "OR" ou "NOT" solto faz o Lucene recusar a consulta inteira.
 _WORDS = re.compile(r"\w+", re.UNICODE)
 
 _SEARCH = f"""
 CALL db.index.fulltext.queryNodes('{CHUNK_INDEX}', $query) YIELD node, score
-MATCH (node)-[:PART_OF {{open: true}}]->(d)
+MATCH (node)-[r:PART_OF {{open: true}}]->(d)
 WHERE d:Doc OR d:Decision
 RETURN node.repo AS repo, node.path AS path, node.first_line AS first_line,
        node.last_line AS last_line, node.heading AS heading, node.text AS text,
-       score AS score, d.title AS title, labels(d)[0] AS kind
+       score AS score, d.title AS title, labels(d)[0] AS kind,
+       r.ingested_at AS ingested_at
 ORDER BY score DESC, repo, path, first_line
 LIMIT $limit
 """
@@ -48,11 +50,12 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
         self._database = database
 
     def search(self, query: str, limit: int = 10) -> list[ChunkHit]:
-        terms = " ".join(_WORDS.findall(query))
-        if not terms or limit < 1:
+        words = _WORDS.findall(query)
+        if not words or limit < 1:
             return []
+        terms = " ".join(f'"{word}"' for word in words)
         records, _, _ = self._driver.execute_query(
-            _SEARCH, query=terms, limit=limit, database_=self._database
+            _SEARCH, query=terms, limit=limit, database_=self._database, routing_="r"
         )
         return [
             ChunkHit(
@@ -65,12 +68,15 @@ class Neo4jKnowledgeIndex(KnowledgeIndex):
                 score=row["score"],
                 document_title=row["title"],
                 document_kind=row["kind"],
+                ingested_at=row["ingested_at"].to_native(),
             )
             for row in records
         ]
 
     def documents(self) -> list[IndexedDocument]:
-        records, _, _ = self._driver.execute_query(_DOCUMENTS, database_=self._database)
+        records, _, _ = self._driver.execute_query(
+            _DOCUMENTS, database_=self._database, routing_="r"
+        )
         return [
             IndexedDocument(
                 repo=row["repo"],

@@ -255,7 +255,7 @@ Só acrescento no fim. Cada entrada: o que foi feito, decisões, reflexões e ap
 **Feito.** Branch empilhada em cima da do diário (PR #5), porque o diário precisa existir aqui para eu acrescentar esta entrada.
 - `StructuralGraph` virou `RepositoryGraph`: o pedaço de grafo de um repo passou a carregar nós de documentação, então o nome por camada deixou de valer.
 - Domínio: nó `Chunk` (pedaço com faixa de linhas), `DocumentChunker` (seções de Markdown, cerquilha dentro de bloco de código não é título), `RouteMentionMatcher` e `DocumentationGraphBuilder`.
-- `engrama index-docs` indexa 16 documentos dos quatro repos em 121 pedaços, com 40 endpoints documentados e 6 valores mascarados. `engrama search` busca com a fonte; `engrama check-sources` mede a recuperação.
+- `engrama index-docs` indexa 18 documentos dos quatro repos (16 `Doc` e 2 `Decision`) em 121 pedaços, com 37 endpoints documentados e 6 valores mascarados. `engrama search` busca com a fonte; `engrama check-sources` mede a recuperação.
 - Contrato novo de `KnowledgeIndex`, rodando contra o índice em memória e contra o índice de texto completo do Neo4j real.
 - 436 testes passando; Portão 1 segue 100% depois de indexar documentos duas vezes, que é a prova de que a separação de donos funciona.
 
@@ -289,3 +289,25 @@ As 4 fontes que faltam são todas de vocabulário diferente do da pergunta — e
 - Rodar contra os quatro repos antes de escrever os testes do extrator achou um defeito que eu não tinha imaginado. Vale fazer a primeira rodada real cedo, mas o teste tem que vir atrás — senão o defeito volta.
 
 **Pendências geradas.** A metade vetorial da busca e as 4 fontes que faltam; comunidades; `DOCUMENTED_IN` de documento para módulo e conceito, que depende de LLM; rota citada entre repos diferentes; pedaços sem sobreposição; qual arquivo de configuração conta como documento (`nginx.conf.template` da fonte de n12 está fora).
+
+### 27/10/2026 — Revisão da Fase 2 e correções (ainda no PR #6)
+
+**Feito.** Rodei o `revisor-de-entregas` (agora registrado de verdade como tipo de agente) antes de abrir o PR. Veredito: aprovado com ressalvas, nenhum bloqueante, 6 achados importantes e 7 sugestões. O revisor conferiu por conta própria os 121 pedaços contra os arquivos (faixas sem sobreposição e sem perder linha), a preservação de `valid_from`/`ingested_at` na reindexação, e varreu os 4 clones procurando valor de credencial no texto indexado.
+
+**Reproduzi cada achado antes de agir**, porque relatório de agente é saída de modelo. Os quatro que eu conferi com script bateram.
+
+**Corrigido.**
+- **I1, o mais sério.** Minha exceção do filtro de segredos (`valor == chave`) ficou larga demais e desligava a regra 2 para a credencial de desenvolvimento mais comum: `flyway.password=password`, `password: password`, `DB_PASSWORD=db_password` e `api_key = "api_key"` passavam intactos. Nos 4 repos de hoje não vazava nada, mas era buraco aberto. Agora exige as três condições juntas: sem aspas, valor igual à chave e um `(` antes na linha, ou seja, argumento repassado dentro de uma chamada. Os seis casos viraram teste.
+- **I2, o mais importante para a honestidade do número.** A CLI dizia que as 70 fontes fora da conta estavam fora "por serem código", o que eu nunca verifiquei — e com isso a pergunta t08 desaparecia inteira da medição, porque as fontes dela são `nginx.conf.template`. Agora o relatório diz "fora do índice de documentos", mostra a distribuição por extensão (`.template 4` salta à vista) e nomeia as perguntas da camada de documentação que ficaram sem nenhuma fonte medida, com as fontes de cada uma. São três: n02 e t09 têm fonte só em código, e quem responde é a camada de estrutura; t08 é buraco de cobertura de verdade.
+- **I3.** `endpoints_documented` somava arestas, não endpoints distintos: eu reportei 40, são 37. Também contei 16 documentos onde são 18 (16 `Doc` e 2 `Decision`). Corrigi a métrica e os números nos documentos.
+- **I4.** Uma pergunta com `AND`, `OR` ou `NOT` solto derrubava a busca: o Lucene recusava a consulta e o erro subia cru. Cada palavra passou a ir entre aspas. Virou caso de contrato nos dois backends.
+- **I6.** O fake do grafo guardava aresta cuja ponta não existe, enquanto o Neo4j descarta em silêncio — e é justamente esse descarte que sustenta o ADR 0010 não regravar o nó do endpoint. Alinhei o fake e fixei no contrato; a mutação mostra o caso reprovando no fake sem a correção.
+- **I5.** Os três comandos novos não tinham teste nenhum. Agora têm oito, justamente sobre os rótulos de I2 e I3.
+- **S1, S2, S3, S5.** Pedaço só de linhas vazias não vira `Chunk` inválido; o ADR deixou de prometer trilha de títulos que o código não dá; as consultas de leitura vão com `routing_="r"`; `ChunkHit` já leva `ingested_at`, que toda resposta de tool precisa devolver.
+
+**Não aceitei um.** S4 pedia condicionar `_CLOSE_ORPHAN_CALLS` à escrita que traz `EXPOSES`, para desacoplar as camadas. O argumento é bom, mas hoje a consulta é inócua (conferido) e mexer nela arrisca deixar uma `CALLS` órfã aberta sem ganho nenhum agora. Fica registrado como acoplamento conhecido.
+
+**Aprendizados.**
+- Meus dois erros de número (40 endpoints, 16 documentos) vieram do mesmo hábito: contar arestas e relatar como coisas, e somar um campo achando que era o total. Métrica que vai para o relatório merece conferência no banco, com `count(DISTINCT ...)`.
+- O achado I2 é o tipo de defeito que nenhum teste pega, porque o código fazia o que eu escrevi: o problema era o rótulo afirmar mais do que a medida sustenta. Revisor com contexto limpo é bom exatamente nisso.
+- Ao estreitar uma regra de segurança, escrever o caso contrário junto: os seis casos de I1 estão no teste, e três deles são o que a versão anterior deixava passar.

@@ -146,7 +146,10 @@ class DocumentChunker:
         for offset, line in enumerate(section.lines):
             size = sum(len(item) + 1 for item in buffer)
             if buffer and size + len(line) > self._max_chars:
-                pieces.append(_Section(section.heading, start, tuple(buffer)))
+                # Pedaco so de linhas vazias nao vira nada: um `Chunk` sem
+                # texto e invalido, e derrubaria a indexacao do repo inteiro.
+                if any(item.strip() for item in buffer):
+                    pieces.append(_Section(section.heading, start, tuple(buffer)))
                 start, buffer = section.first_line + offset, []
             buffer.append(line)
         if any(line.strip() for line in buffer):

@@ -36,7 +36,7 @@ Arquivos excluídos por tipo nos mesmos commits: 14 PDFs (artigos da base do RAG
 
 ## O que a máscara faz nos quatro repos
 
-Na indexação dos 16 documentos, 6 valores são mascarados, todos pela regra 2:
+Na indexação dos 18 documentos (16 `Doc` e 2 `Decision`), 6 valores são mascarados, todos pela regra 2:
 
 | Documento | Linha | Chave |
 | --- | --- | --- |

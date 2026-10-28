@@ -38,7 +38,7 @@ class Neo4jStructureReader(StructureReader):
         self._database = database
 
     def routes(self) -> list[RouteFact]:
-        records, _, _ = self._driver.execute_query(_ROUTES, database_=self._database)
+        records, _, _ = self._driver.execute_query(_ROUTES, database_=self._database, routing_="r")
         return [
             RouteFact(row["repo"], evidence["path"], evidence["line"], row["route"])
             for row in records
@@ -46,11 +46,15 @@ class Neo4jStructureReader(StructureReader):
         ]
 
     def datastores(self) -> list[DataStoreFact]:
-        records, _, _ = self._driver.execute_query(_DATASTORES, database_=self._database)
+        records, _, _ = self._driver.execute_query(
+            _DATASTORES, database_=self._database, routing_="r"
+        )
         return [DataStoreFact(row["repo"], row["kind"], row["name"]) for row in records]
 
     def endpoints(self) -> list[Endpoint]:
-        records, _, _ = self._driver.execute_query(_ENDPOINTS, database_=self._database)
+        records, _, _ = self._driver.execute_query(
+            _ENDPOINTS, database_=self._database, routing_="r"
+        )
         return [
             Endpoint(row["repo"], HttpRoute(HttpMethod(row["method"]), row["path"]), row["handler"])
             for row in records
@@ -59,7 +63,7 @@ class Neo4jStructureReader(StructureReader):
     def calls(self) -> list[CallFact]:
         """Uma CALLS carrega a evidencia dos dois lados; os pontos de chamada
         sao as evidencias do repo cliente."""
-        records, _, _ = self._driver.execute_query(_CALLS, database_=self._database)
+        records, _, _ = self._driver.execute_query(_CALLS, database_=self._database, routing_="r")
         facts = []
         for row in records:
             shape = HttpRoute(HttpMethod(row["method"]), row["path"]).shape

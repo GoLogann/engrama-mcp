@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,18 +34,48 @@ class SourceLookup:
         return self.rank is not None
 
 
+DOCUMENTATION_LAYER = "documentacao"
+
+
+@dataclass(frozen=True, slots=True)
+class SkippedSource:
+    """Fonte que a medida nao cobre, porque o arquivo nao esta no indice.
+
+    Guarda a pergunta junto para o relatorio poder dizer *por que* uma
+    pergunta ficou sem medida: fonte em codigo (que a camada de estrutura
+    responde) nao e a mesma coisa que arquivo de texto que o indexador
+    escolheu nao cobrir.
+    """
+
+    question_id: str
+    source: str
+
+    @property
+    def suffix(self) -> str:
+        return PurePosixPath(self.source.partition(":")[0]).suffix or "(sem extensão)"
+
+
 @dataclass(frozen=True, slots=True)
 class SourceRecallReport:
     """Quanto da fonte esperada a busca encontra, sem LLM nenhum no meio.
 
-    Mede so as fontes que sao documento indexado: as que apontam para codigo
-    pertencem a camada de estrutura e entram em `skipped`.
+    Mede so as fontes cujo arquivo esta no indice. `skipped` traz as outras,
+    que em geral apontam para codigo e pertencem a camada de estrutura — mas
+    nao necessariamente: arquivo de texto que o indexador nao cobre tambem cai
+    aqui, e aparecer em `skipped` nao e atestado de que o engrama responderia.
+    Por isso `unmeasured` nomeia as perguntas da camada de documentacao que
+    ficaram sem nenhuma fonte medida: para elas a medida nao diz nada, e e
+    buraco de cobertura, nao acerto.
     """
 
     limit: int
     questions: int
     lookups: tuple[SourceLookup, ...]
-    skipped: tuple[str, ...] = ()
+    skipped: tuple[SkippedSource, ...] = ()
+    unmeasured: tuple[str, ...] = ()
+
+    def skipped_of(self, question_id: str) -> tuple[str, ...]:
+        return tuple(item.source for item in self.skipped if item.question_id == question_id)
 
     @property
     def found(self) -> int:

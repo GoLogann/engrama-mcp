@@ -15,7 +15,7 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 
 2. **Decisão (ADR) pelo diretório.** `docs/decisoes/`, `docs/decisions/`, `adr/` e `adrs/` viram nós `Decision`; o resto vira `Doc`. O critério é o caminho, não o conteúdo: é determinístico e é a convenção dos repos do LABit. O `status` sai da linha "Status:" do próprio documento, e o título, do primeiro título do arquivo (ou do nome dele).
 
-3. **Pedaço (`Chunk`) é o que entra no índice**, com a faixa de linhas de onde saiu. Um documento inteiro não serve como unidade de busca: `docs/integracao_api.md` tem 983 linhas, e a fonte que o MCP cita precisa apontar para a linha, que é o formato das fontes das perguntas de ouro (`repo/caminho:linha`). O corte segue as seções do Markdown: seções curtas seguidas são juntadas até 1500 caracteres, e seção maior que isso é cortada em limite de linha. Cada pedaço carrega a trilha de títulos até ele (`Instalação > Docker`).
+3. **Pedaço (`Chunk`) é o que entra no índice**, com a faixa de linhas de onde saiu. Um documento inteiro não serve como unidade de busca: `docs/integracao_api.md` tem 983 linhas, e a fonte que o MCP cita precisa apontar para a linha, que é o formato das fontes das perguntas de ouro (`repo/caminho:linha`). O corte segue as seções do Markdown: seções curtas seguidas são juntadas até 1500 caracteres, e seção maior que isso é cortada em limite de linha. Cada pedaço carrega a trilha de títulos da seção em que ele começa (`Instalação > Docker`).
 
 4. **`DOCUMENTED_IN` só com evidência que não exige interpretação.** Duas formas: o `README.md` da raiz documenta o repo, e uma rota escrita no texto (`POST /api/v1/generate`) documenta aquele endpoint. Dizer que um documento qualquer documenta determinado módulo é leitura de conteúdo, não extração: fica para a parte com LLM, com origem e confiança próprias (princípio 1 do doc de fundamentação).
 
@@ -27,7 +27,7 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 
 8. **A máscara de segredos roda na indexação**, antes de o texto virar nó, como o ADR 0005 previu.
 
-9. **Busca por texto com analisador português.** Medido contra as fontes das perguntas de ouro: o analisador português acha o arquivo certo em 82% das fontes de documento (k=10), contra 68% do analisador padrão — os documentos dos quatro repos são em português. Indexar também o caminho do arquivo foi medido e não mudou nada (82%), então ficou de fora. A consulta é reduzida às palavras antes de ir ao Lucene, em vez de escapar caractere por caractere: é assim que o texto indexado também é quebrado, e nenhuma pontuação da pergunta pode virar operador.
+9. **Busca por texto com analisador português.** Medido contra as fontes das perguntas de ouro: o analisador português acha o arquivo certo em 82% das fontes de documento (k=10), contra 68% do analisador padrão — os documentos dos quatro repos são em português. Indexar também o caminho do arquivo foi medido e não mudou nada (82%), então ficou de fora. A consulta é reduzida às palavras antes de ir ao Lucene e cada palavra vai entre aspas: é assim que o texto indexado também é quebrado, e nem a pontuação nem uma palavra-operador (`AND`, `OR`, `NOT`) da pergunta pode virar sintaxe. Sem as aspas, uma pergunta com uma dessas palavras soltas fazia o Lucene recusar a consulta inteira.
 
 ## Alternativas consideradas
 
@@ -37,9 +37,12 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 - **Uma ingestão só para estrutura e documentação:** evitaria o dono por camada, mas amarraria reindexar documento a reextrair código, e a mesma rodada teria de passar pelos dois.
 - **`DOCUMENTED_IN` de módulo para o README do diretório:** tentador e barato, mas o nó `Module` de `docs/` pode não existir (a estrutura só cria módulo onde há código), e a aresta sumiria em silêncio.
 
+10. **A medida de recuperação de fonte só conta a fonte cujo arquivo está no índice**, e nomeia as perguntas da camada de documentação que ficaram sem nenhuma fonte medida. Fonte fora do índice não é acerto nem erro: dizer "as outras são código" seria afirmar o que não foi verificado, e esconderia uma pergunta inteira (t08, cujas fontes são `nginx.conf.template`).
+
 ## Consequências
 
 - `engrama index-docs` depende de `engrama ingest` para ligar rota citada a endpoint. Sem estrutura no grafo, ele indexa e avisa que nenhum endpoint era conhecido.
 - A busca de hoje é só por palavra. As 4 fontes que ela não acha (`package.json` de n18, os dois `flyway*.config` de t12 e o README do frontend de n12) são todas de vocabulário diferente do da pergunta, que é justamente o que a parte vetorial resolve.
+- Três perguntas da camada de documentação ficam sem nenhuma fonte medida, por dois motivos diferentes: n02 e t09 têm fontes só em código (quem responde é a camada de estrutura, e o enunciado de n02 diz isso), e t08 aponta para `nginx.conf.template`, que o critério do item 1 não cobre. A primeira é classificação da pergunta; a segunda é buraco de cobertura e está como pendência.
 - Rota citada num documento que nenhum endpoint expõe fica registrada no relatório como desalinhamento entre documentação e código — um dos achados que a PoC quer mostrar. Hoje são 5, entre elas o `POST /users` do ADR 0001.
 - Documento de repo cliente que cita rota de outro repo (o README do frontend, por exemplo) não gera aresta. É limitação consciente da regra "mesmo repo".

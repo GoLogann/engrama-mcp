@@ -1,4 +1,10 @@
-from engrama.application.dto.evaluation import GoldenQuestion, SourceLookup, SourceRecallReport
+from engrama.application.dto.evaluation import (
+    DOCUMENTATION_LAYER,
+    GoldenQuestion,
+    SkippedSource,
+    SourceLookup,
+    SourceRecallReport,
+)
 from engrama.application.dto.knowledge import ChunkHit
 from engrama.application.ports.knowledge import GoldenQuestionSource, KnowledgeIndex
 
@@ -23,23 +29,29 @@ class MeasureSourceRecall:
         indexed = {f"{document.repo}/{document.path}" for document in self._index.documents()}
 
         lookups: list[SourceLookup] = []
-        skipped: list[str] = []
+        skipped: list[SkippedSource] = []
+        unmeasured: list[str] = []
         for question in questions:
             hits: list[ChunkHit] | None = None
+            measured = 0
             for source in question.sources:
                 file, _, line = source.partition(":")
                 if file not in indexed:
-                    skipped.append(source)
+                    skipped.append(SkippedSource(question.id, source))
                     continue
                 if hits is None:
                     hits = self._index.search(question.question, limit)
                 lookups.append(self._lookup(question, source, file, line, hits))
+                measured += 1
+            if not measured and question.layer == DOCUMENTATION_LAYER:
+                unmeasured.append(question.id)
 
         return SourceRecallReport(
             limit=limit,
             questions=len(questions),
             lookups=tuple(lookups),
             skipped=tuple(skipped),
+            unmeasured=tuple(unmeasured),
         )
 
     @staticmethod

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -17,7 +18,8 @@ class ChunkHit:
     """Pedaco de documento devolvido pela busca, com de onde ele saiu.
 
     `source` e o que o MCP cita, no mesmo formato das fontes das perguntas de
-    ouro: `repo/caminho:linha`.
+    ouro: `repo/caminho:linha`. `ingested_at` e quando o grafo soube deste
+    pedaco, que toda resposta de tool precisa devolver junto da fonte.
     """
 
     repo: str
@@ -29,6 +31,7 @@ class ChunkHit:
     score: float
     document_title: str
     document_kind: str
+    ingested_at: datetime
 
     @property
     def source(self) -> str:

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 from engrama.application.dto.knowledge import ChunkHit, IndexedDocument
 from engrama.application.ports.knowledge import KnowledgeIndex
@@ -27,11 +28,11 @@ class InMemoryKnowledgeIndex(KnowledgeIndex):
         if not terms or limit < 1:
             return []
         scored = []
-        for chunk, document in self._chunks():
+        for chunk, document, ingested_at in self._chunks():
             words = {word.lower() for word in _WORDS.findall(f"{chunk.text} {chunk.heading}")}
             score = len(terms & words)
             if score:
-                scored.append((score, chunk, document))
+                scored.append((score, chunk, document, ingested_at))
         scored.sort(key=lambda item: (-item[0], item[1].key))
         return [
             ChunkHit(
@@ -44,13 +45,14 @@ class InMemoryKnowledgeIndex(KnowledgeIndex):
                 score=float(score),
                 document_title=document.title,
                 document_kind=document.node_kind.value,
+                ingested_at=ingested_at,
             )
-            for score, chunk, document in scored[:limit]
+            for score, chunk, document, ingested_at in scored[:limit]
         ]
 
     def documents(self) -> list[IndexedDocument]:
         chunks: dict[str, int] = {}
-        for _, document in self._chunks():
+        for _, document, _ingested_at in self._chunks():
             chunks[document.key] = chunks.get(document.key, 0) + 1
         found = [
             IndexedDocument(
@@ -64,7 +66,7 @@ class InMemoryKnowledgeIndex(KnowledgeIndex):
         ]
         return sorted(found)
 
-    def _chunks(self) -> list[tuple[Chunk, object]]:
+    def _chunks(self) -> list[tuple[Chunk, object, datetime]]:
         documents = {document.ref: document for document in self._open_documents()}
         found = []
         for stored in self._graph.open_edges(EdgeKind.PART_OF):
@@ -74,7 +76,7 @@ class InMemoryKnowledgeIndex(KnowledgeIndex):
             chunk = self._graph.nodes.get((NodeKind.CHUNK.value, stored.edge.source.key))
             if document is not None and chunk is not None:
                 assert isinstance(chunk, Chunk)
-                found.append((chunk, document))
+                found.append((chunk, document, stored.edge.validity.ingested_at))
         return found
 
     def _open_documents(self) -> list:

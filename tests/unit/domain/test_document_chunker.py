@@ -111,3 +111,12 @@ def test_fim_de_linha_do_windows_nao_entra_no_texto():
 
     assert "\r" not in chunks[0].text
     assert chunks[0].last_line == 3
+
+
+def test_secao_grande_so_de_linhas_vazias_nao_gera_pedaco():
+    """Pedaco sem texto nao e `Chunk` valido: se escapasse daqui, derrubaria a
+    indexacao do repo inteiro."""
+    chunks = chunk_text("# t\n" + "\n" * 200 + "fim\n", max_chars=60)
+
+    assert all(c.text.strip() for c in chunks)
+    assert chunks[-1].text.strip().endswith("fim")

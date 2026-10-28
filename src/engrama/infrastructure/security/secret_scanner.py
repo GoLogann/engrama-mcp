@@ -78,10 +78,7 @@ class RegexSecretScanner(SecretScanner):
                 return f"{head}${{{default['name']}{default['op']}{REDACTED}}}{quote}"
             if not value or _NOT_A_VALUE.search(value):
                 return match.group(0)
-            if value.lower() == match.group("key").lower():
-                # `OpenAI(api_key=api_key)`: parametro repassado, nao segredo.
-                # Mascarar estraga exemplo de codigo na documentacao, e o unico
-                # "segredo" que isso deixa passar e a propria palavra da chave.
+            if self._is_forwarded_argument(match, value):
                 return match.group(0)
             rules.append("key-value")
             return f"{head}{REDACTED}{quote}"
@@ -97,3 +94,19 @@ class RegexSecretScanner(SecretScanner):
                 line = line.replace(value, REDACTED)
                 rules.append(secret.type)
         return line, rules
+
+    @staticmethod
+    def _is_forwarded_argument(match: re.Match[str], value: str) -> bool:
+        """`OpenAI(api_key=api_key)`: argumento repassando a variavel do mesmo
+        nome, dentro de uma chamada. Mascarar isso estraga exemplo de codigo na
+        documentacao e nao esconde nada, porque o valor e a palavra da chave.
+
+        Exige as tres condicoes juntas, senao a regra viraria um buraco: sem
+        aspas (um literal `api_key = "api_key"` ate pode ser a senha de
+        verdade), valor igual a chave, e um `(` antes na linha, para
+        `flyway.password=password` e `DB_PASSWORD=db_password` continuarem
+        mascarados.
+        """
+        if match.group("bare") is None or value.lower() != match.group("key").lower():
+            return False
+        return "(" in match.string[: match.start()]

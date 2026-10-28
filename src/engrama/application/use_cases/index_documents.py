@@ -97,8 +97,10 @@ class IndexDocuments:
             documents=kinds.count(DocumentKind.DOC),
             decisions=kinds.count(DocumentKind.DECISION),
             chunks=sum(1 for node in graph.nodes if node.node_kind is NodeKind.CHUNK),
-            endpoints_documented=sum(
-                1 for edge in graph.edges if edge.source.kind is NodeKind.ENDPOINT
+            # Endpoints distintos, nao arestas: o mesmo endpoint citado em dois
+            # documentos rende duas arestas e continua sendo um endpoint.
+            endpoints_documented=len(
+                {edge.source for edge in graph.edges if edge.source.kind is NodeKind.ENDPOINT}
             ),
             redactions=len(documents.redactions),
         )
