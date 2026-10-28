@@ -13,6 +13,8 @@ from engrama.domain.value_objects import Validity
 class LinkResult:
     report: MatchReport
     edges_by_caller: Mapping[str, tuple[Edge, ...]]
+    # Pares cliente -> servidor que o codigo mostra e o catalogo nao declara.
+    undeclared: tuple[tuple[str, str], ...] = ()
 
 
 class LinkCallsToRoutes:
@@ -42,4 +44,32 @@ class LinkCallsToRoutes:
             )
             for caller, matches in by_caller.items()
         }
-        return LinkResult(report=report, edges_by_caller=edges)
+        return LinkResult(
+            report=report,
+            edges_by_caller=edges,
+            undeclared=self._undeclared(report, consumes),
+        )
+
+    @staticmethod
+    def _undeclared(
+        report: MatchReport, consumes: Mapping[str, Sequence[str]]
+    ) -> tuple[tuple[str, str], ...]:
+        """Chamadas que atravessaram repos sem o catalogo declarar `consumes`.
+
+        Sem `consumes`, o casamento considera qualquer outro repo como destino
+        possivel (`CallRouteMatcher`), e a chamada casa de qualquer forma —
+        em silencio. O preco aparece depois: uma rota que exista em dois repos
+        fica ambigua sem motivo aparente, e uma ingestao parcial nao sabe que
+        precisa trazer o servidor junto. Por isso isto e diagnostico, e nao
+        erro: a extracao esta certa, o catalogo e que esta incompleto.
+        """
+        return tuple(
+            sorted(
+                {
+                    (match.call.repo, match.route.repo)
+                    for match in report.matches
+                    if match.route.repo != match.call.repo
+                    and match.route.repo not in (consumes.get(match.call.repo) or ())
+                }
+            )
+        )

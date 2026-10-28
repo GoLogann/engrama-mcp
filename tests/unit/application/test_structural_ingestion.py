@@ -191,3 +191,34 @@ def test_conferencia_de_bancos_aponta_o_que_falta_e_o_que_sobra():
     assert report.unexpected_datastores == ()
     assert report.datastore_coverage == 0.5
     assert not report.passed
+
+
+def test_chamada_entre_repos_sem_consumes_declarado_vira_diagnostico():
+    """Sem `consumes`, o casamento aceita qualquer repo como destino e a
+    chamada casa em silencio. O preco aparece depois — rota que existe em dois
+    repos fica ambigua sem motivo aparente, e ingestao parcial nao sabe que
+    precisa trazer o servidor. Diagnostico, nao erro: a extracao esta certa e
+    o catalogo e que esta incompleto."""
+    graph = InMemoryGraph()
+    sem_consumes = Catalog(
+        projects=(Project("forge", "Forge"),),
+        repos=(RepositorySpec(API), RepositorySpec(FRONT)),
+    )
+
+    trees = {"forge-api": API_FILES, "forge-front": FRONT_FILES}
+    report = make(trees, graph, catalog=sem_consumes).execute()
+
+    assert len(report.links.matches) == 1, "a chamada casa mesmo sem declaracao"
+    assert any(
+        "forge-front chama forge-api e o catalogo nao declara" in d for d in report.diagnostics
+    ), report.diagnostics
+
+
+def test_consumes_declarado_nao_gera_diagnostico():
+    graph = InMemoryGraph()
+
+    trees = {"forge-api": API_FILES, "forge-front": FRONT_FILES}
+    report = make(trees, graph).execute()
+
+    assert report.links.matches
+    assert not [d for d in report.diagnostics if "nao declara" in d]

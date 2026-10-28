@@ -75,6 +75,11 @@ class BuildStructuralGraph:
                 for r in repositories
             ),
             links=links.report,
-            diagnostics=tuple(d for r in repositories for d in r.facts.diagnostics),
+            diagnostics=tuple(d for r in repositories for d in r.facts.diagnostics)
+            + tuple(
+                f"{caller} chama {target} e o catalogo nao declara: "
+                f"acrescente `consumes: [{target}]` em config/repos.yaml"
+                for caller, target in links.undeclared
+            ),
             related=tuple(n for n in names if only and n not in only),
         )
