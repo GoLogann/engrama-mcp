@@ -25,6 +25,8 @@ Três decisões não estavam no plano e precisam de registro: o que conta como d
 
 7. **O nó do endpoint não é regravado pela documentação.** A escrita faz `SET n += row`: incluir o `Endpoint` no grafo da documentação apagaria o `handler` que a estrutura gravou.
 
+11. **Issue citada num documento vira `REFERENCES_ISSUE`** *(acrescentado em 28/10/2026)*. A ontologia e o domínio já permitiam `Doc`/`Decision` → `Issue` com origem `extraction`; faltava a extração criar a aresta, porque o leitor de citações era um `CodeExtractor` e só abria arquivos de código. A leitura virou o serviço de domínio `IssueCitationReader`, que código e documento compartilham; o que difere é onde a citação é pendurada e o que conta como "logo depois" (em código, só a próxima linha de comentário; em Markdown, a próxima linha, a menos que esteja em branco). São 18 citações nos quatro repos, em 3 documentos.
+
 8. **A máscara de segredos roda na indexação**, antes de o texto virar nó, como o ADR 0005 previu.
 
 9. **Busca por texto com analisador português.** Medido contra as fontes das perguntas de ouro: o analisador português acha o arquivo certo em 82% das fontes de documento (k=10), contra 68% do analisador padrão — os documentos dos quatro repos são em português. Indexar também o caminho do arquivo foi medido e não mudou nada (82%), então ficou de fora. A consulta é reduzida às palavras antes de ir ao Lucene e cada palavra vai entre aspas: é assim que o texto indexado também é quebrado, e nem a pontuação nem uma palavra-operador (`AND`, `OR`, `NOT`) da pergunta pode virar sintaxe. Sem as aspas, uma pergunta com uma dessas palavras soltas fazia o Lucene recusar a consulta inteira.

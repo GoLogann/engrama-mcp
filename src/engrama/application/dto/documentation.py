@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from engrama.application.dto.ingestion import RepositorySpec
-from engrama.domain.value_objects.document_facts import DocumentFile, RouteMention
+from engrama.domain.value_objects.document_facts import (
+    DocumentFile,
+    DocumentIssueCitation,
+    RouteMention,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,12 +16,14 @@ class DocumentFacts:
 
     documents: tuple[DocumentFile, ...] = ()
     mentions: tuple[RouteMention, ...] = ()
+    issues: tuple[DocumentIssueCitation, ...] = ()
     diagnostics: tuple[str, ...] = ()
 
     def merged(self, other: "DocumentFacts") -> "DocumentFacts":
         return DocumentFacts(
             documents=self.documents + other.documents,
             mentions=self.mentions + other.mentions,
+            issues=self.issues + other.issues,
             diagnostics=self.diagnostics + other.diagnostics,
         )
 
@@ -44,6 +50,9 @@ class DocumentSummary:
     chunks: int
     endpoints_documented: int
     redactions: int
+    # Issues citadas nos documentos do repo. A ontologia sempre permitiu
+    # `Doc`/`Decision` -> `Issue`; so a extracao nao as criava.
+    issues: int = 0
 
 
 @dataclass(frozen=True, slots=True)

@@ -173,3 +173,57 @@ def test_chunk_cita_a_fonte_no_formato_das_perguntas_de_ouro():
     chunk = Chunk("forge-api", "README.md", 2, "texto", first_line=52, last_line=60)
 
     assert chunk.source == "forge-api/README.md:52"
+
+
+def test_documento_que_cita_issue_ganha_referencia():
+    """A ontologia sempre permitiu `Doc`/`Decision` -> `Issue` com origem
+    `extraction`; faltava a extracao criar a aresta."""
+    from engrama.domain.value_objects.document_facts import DocumentIssueCitation
+
+    citacao = DocumentIssueCitation(
+        repo=API.name,
+        path="README.md",
+        issue_repo=API.name,
+        number=7,
+        evidence=Evidence.in_code(API.name, "README.md", C, 12),
+    )
+
+    graph = DocumentationGraphBuilder(DocumentChunker(max_chars=1000)).repository(
+        repo=API,
+        documents=[document()],
+        mentions=NO_MENTIONS,
+        validity=VALIDITY,
+        issues=[citacao],
+    )
+
+    issues = [node for node in graph.nodes if node.node_kind is NodeKind.ISSUE]
+    assert [(one.repo, one.number) for one in issues] == [(API.name, 7)]
+    arestas = [edge for edge in graph.edges if edge.kind is EdgeKind.REFERENCES_ISSUE]
+    assert len(arestas) == 1
+    assert arestas[0].source.key == f"{API.name}:README.md"
+    assert arestas[0].target.key == f"{API.name}#7"
+    assert arestas[0].provenance.evidence, "aresta sem evidencia nao se explica"
+
+
+def test_citacao_de_documento_que_nao_existe_e_ignorada():
+    """Vetor solto nunca cria no: se o caminho nao e de um documento lido, a
+    citacao nao vira aresta pendurada em nada."""
+    from engrama.domain.value_objects.document_facts import DocumentIssueCitation
+
+    citacao = DocumentIssueCitation(
+        repo=API.name,
+        path="nao-lido.md",
+        issue_repo=API.name,
+        number=9,
+        evidence=Evidence.in_code(API.name, "nao-lido.md", C, 1),
+    )
+
+    graph = DocumentationGraphBuilder(DocumentChunker(max_chars=1000)).repository(
+        repo=API,
+        documents=[document()],
+        mentions=NO_MENTIONS,
+        validity=VALIDITY,
+        issues=[citacao],
+    )
+
+    assert [node for node in graph.nodes if node.node_kind is NodeKind.ISSUE] == []

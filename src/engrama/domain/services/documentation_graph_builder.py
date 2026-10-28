@@ -1,12 +1,16 @@
 from collections import defaultdict
 from collections.abc import Sequence
 
-from engrama.domain.entities import Chunk, Decision, Doc, Edge, EdgeKind, Node, Repo
+from engrama.domain.entities import Chunk, Decision, Doc, Edge, EdgeKind, Issue, Node, Repo
 from engrama.domain.services.document_chunker import DocumentChunker
 from engrama.domain.services.repository_graph import RepositoryGraph
 from engrama.domain.services.route_mention_matcher import MentionReport
 from engrama.domain.value_objects import Evidence, NodeRef, Provenance, Validity
-from engrama.domain.value_objects.document_facts import DocumentFile, DocumentKind
+from engrama.domain.value_objects.document_facts import (
+    DocumentFile,
+    DocumentIssueCitation,
+    DocumentKind,
+)
 
 README = "README.md"
 
@@ -34,12 +38,15 @@ class DocumentationGraphBuilder:
         documents: Sequence[DocumentFile],
         mentions: MentionReport,
         validity: Validity,
+        issues: Sequence[DocumentIssueCitation] = (),
     ) -> RepositoryGraph:
         nodes: dict[NodeRef, Node] = {repo.ref: repo}
         edges: list[Edge] = []
+        por_caminho: dict[str, NodeRef] = {}
         for document in documents:
             node = self._document_node(document)
             nodes[node.ref] = node
+            por_caminho[document.path] = node.ref
             edges.append(
                 self._edge(EdgeKind.PART_OF, node.ref, repo.ref, [document.evidence], validity)
             )
@@ -68,6 +75,26 @@ class DocumentationGraphBuilder:
             grouped[(match.endpoint.ref, target)].append(match.mention.evidence)
         for (source, target), evidence in grouped.items():
             edges.append(self._edge(EdgeKind.DOCUMENTED_IN, source, target, evidence, validity))
+
+        # `REFERENCES_ISSUE` de documento. A ontologia sempre permitiu
+        # `Doc`/`Decision` -> `Issue` com origem `extraction`; faltava a
+        # extracao criar. O no da issue e o mesmo que o codigo cita, porque
+        # a chave e `repo#numero`: o grafo junta os dois lados sozinho.
+        for citation in issues:
+            origem = por_caminho.get(citation.path)
+            if origem is None:
+                continue
+            issue = Issue(repo=citation.issue_repo, number=citation.number)
+            nodes.setdefault(issue.ref, issue)
+            edges.append(
+                self._edge(
+                    EdgeKind.REFERENCES_ISSUE,
+                    origem,
+                    issue.ref,
+                    [citation.evidence],
+                    validity,
+                )
+            )
 
         return RepositoryGraph(tuple(nodes.values()), tuple(edges))
 

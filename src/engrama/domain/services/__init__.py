@@ -1,6 +1,11 @@
 from engrama.domain.services.call_route_matcher import CallRouteMatcher, MatchReport, RouteMatch
 from engrama.domain.services.document_chunker import DocumentChunker, TextChunk, first_heading
 from engrama.domain.services.documentation_graph_builder import DocumentationGraphBuilder
+from engrama.domain.services.issue_citation import (
+    CitationReport,
+    IssueCitation,
+    IssueCitationReader,
+)
 from engrama.domain.services.repository_graph import RepositoryGraph
 from engrama.domain.services.route_mention_matcher import (
     MentionMatch,
@@ -13,8 +18,11 @@ from engrama.domain.services.structural_graph_builder import ROOT_MODULE, Struct
 __all__ = [
     "ROOT_MODULE",
     "CallRouteMatcher",
+    "CitationReport",
     "DocumentChunker",
     "DocumentationGraphBuilder",
+    "IssueCitation",
+    "IssueCitationReader",
     "MatchReport",
     "MentionMatch",
     "MentionReport",

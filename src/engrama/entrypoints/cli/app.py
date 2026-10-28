@@ -126,7 +126,7 @@ def _print_indexing(report: IndexingReport) -> None:
         typer.echo(
             f"{repo.repo}: {repo.documents} documentos, {repo.decisions} decisões, "
             f"{repo.chunks} pedaços, {repo.endpoints_documented} endpoints documentados, "
-            f"{repo.redactions} valores mascarados"
+            f"{repo.issues} issues citadas, {repo.redactions} valores mascarados"
         )
     chunks = sum(repo.chunks for repo in report.repos)
     typer.echo(f"\nPedaços com vetor: {report.vectors} de {chunks}")

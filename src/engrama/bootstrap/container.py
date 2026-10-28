@@ -16,6 +16,7 @@ from engrama.bootstrap.settings import Settings
 from engrama.domain.services import (
     DocumentationGraphBuilder,
     DocumentChunker,
+    IssueCitationReader,
     RouteMentionMatcher,
     RouteNormalizer,
     StructuralGraphBuilder,
@@ -95,7 +96,12 @@ class Container(containers.DeclarativeContainer):
         providers.Singleton(ComposeExtractor),
         providers.Singleton(IssueReferenceExtractor, catalog.provided.load.call().repo_names),
     )
-    document_extractor = providers.Singleton(RepositoryDocumentExtractor, route_normalizer)
+    issue_citations = providers.Singleton(
+        IssueCitationReader, catalog.provided.load.call().repo_names
+    )
+    document_extractor = providers.Singleton(
+        RepositoryDocumentExtractor, route_normalizer, issue_citations
+    )
 
     embedder = providers.Singleton(
         embedder_or_none,

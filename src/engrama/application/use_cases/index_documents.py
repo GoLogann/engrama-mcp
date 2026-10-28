@@ -77,6 +77,7 @@ class IndexDocuments:
                 documents=documents.facts.documents,
                 mentions=mentions,
                 validity=Validity.starting(documents.committed_at, ingested_at=now),
+                issues=documents.facts.issues,
             )
             graphs[documentation_owner(spec.repo.name)] = graph
             summaries.append(self._summary(documents, graph))
@@ -128,4 +129,5 @@ class IndexDocuments:
                 {edge.source for edge in graph.edges if edge.source.kind is NodeKind.ENDPOINT}
             ),
             redactions=len(documents.redactions),
+            issues=len(documents.facts.issues),
         )

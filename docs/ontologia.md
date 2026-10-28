@@ -45,6 +45,8 @@ Decisões de modelagem:
 
 As quatro arestas estruturais só vêm da extração determinística (princípio 1 do doc). O LLM resume e liga conceitos, mas nunca cria `CALLS`.
 
+`REFERENCES_ISSUE` nasce de duas leituras do mesmo tipo de frase: do código, pendurada no `Module` do arquivo, e do texto de um documento, pendurada no `Doc` ou `Decision`. As duas usam o mesmo `IssueCitationReader`, e o nó da issue é o mesmo — a chave é `repo#número`, então o grafo junta os dois lados sozinho. Uma citação que aponta para outro repo e não diz qual de forma resolvível (`issue #10 do app`) **não** vira aresta: fica como diagnóstico, porque atribuí-la ao próprio repo gravaria a issue errada com confiança alta.
+
 Da extração, `DOCUMENTED_IN` nasce em duas formas, as que não exigem interpretação: o `README.md` da raiz documenta o repo, e uma rota escrita no texto de um documento documenta aquele endpoint, quando ele existe no grafo e a citação não é ambígua (ADR 0010). Ligar um documento a um módulo ou a um conceito é leitura de conteúdo, e vem com origem `llm`.
 
 ## Propriedades obrigatórias
