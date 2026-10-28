@@ -45,10 +45,22 @@ def test_mascara_credenciais_dos_repos(line, secret):
         "POSTGRES_DB: phishing_quest",
         "      API_KEY: ${API_KEY:-}",
         "      API_KEY: ${API_KEY}",
+        # Parametro repassado num exemplo de codigo da documentacao: o valor e
+        # a propria chave, entao mascarar estraga o exemplo e nao esconde nada.
+        "        self.client = OpenAI(api_key=api_key)",
+        "    client = Client(API_KEY=API_KEY)",
     ],
 )
 def test_preserva_referencias_e_nomes(line):
     assert scanner.redact(line).text == line
+
+
+def test_valor_diferente_da_chave_continua_mascarado():
+    """O caso parecido que nao e repasse: valor de verdade ao lado da chave."""
+    redaction = scanner.redact("        self.client = OpenAI(api_key=sk-nao-e-repasse)")
+
+    assert REDACTED in redaction.text
+    assert "sk-nao-e-repasse" not in redaction.text
 
 
 def test_mantem_a_chave_e_informa_a_linha():

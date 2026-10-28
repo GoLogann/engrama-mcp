@@ -69,6 +69,12 @@ class InMemoryGraph(GraphWriter, StructureReader):
                     )
         return facts
 
+    def endpoints(self) -> list[Endpoint]:
+        found = {
+            endpoint.key: endpoint for _, endpoint in self._open_to_endpoints(EdgeKind.EXPOSES)
+        }
+        return [found[key] for key in sorted(found)]
+
     def datastores(self) -> list[DataStoreFact]:
         facts = []
         for stored in self.open_edges(EdgeKind.STORES_IN):

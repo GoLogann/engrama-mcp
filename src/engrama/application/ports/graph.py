@@ -8,6 +8,7 @@ from engrama.application.dto.structure_check import (
     GroundTruth,
     RouteFact,
 )
+from engrama.domain.entities import Endpoint
 from engrama.domain.services import RepositoryGraph
 
 
@@ -25,7 +26,8 @@ class GraphWriter(ABC):
 
 
 class StructureReader(ABC):
-    """Leitura das rotas, chamadas e bancos gravados, para conferir com o groundtruth."""
+    """Leitura da camada de estrutura gravada: para conferir com o groundtruth
+    e para a documentacao saber quais endpoints existem."""
 
     @abstractmethod
     def routes(self) -> list[RouteFact]: ...
@@ -35,6 +37,15 @@ class StructureReader(ABC):
 
     @abstractmethod
     def datastores(self) -> list[DataStoreFact]: ...
+
+    @abstractmethod
+    def endpoints(self) -> list[Endpoint]:
+        """Os endpoints com aresta `EXPOSES` aberta, um por endpoint.
+
+        A camada de documentacao so liga uma rota citada num texto a um
+        endpoint que esta aqui: assim a aresta nunca aponta para um no que
+        nao existe no grafo.
+        """
 
 
 class GroundTruthSource(ABC):

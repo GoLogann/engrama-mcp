@@ -1,10 +1,45 @@
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 # Titulo ATX (`## Contexto`). O que vem depois de ``` ou ~~~ e codigo: um `#`
 # dentro de um bloco de codigo e comentario de shell, nao titulo.
 _HEADING = re.compile(r"^(?P<level>#{1,6})\s+(?P<text>.+?)\s*#*\s*$")
 _FENCE = re.compile(r"^\s*(?P<fence>```+|~~~+)")
+
+
+@dataclass(frozen=True, slots=True)
+class Heading:
+    level: int
+    text: str
+
+
+def scan_headings(lines: list[str]) -> Iterator[tuple[int, str, Heading | None]]:
+    """Cada linha com seu numero (1-based) e, se for titulo, o titulo.
+
+    Dentro de bloco de codigo nada e titulo: num README cheio de shell, `#` e
+    comentario. Quem le o texto do documento (chunker, leitura do titulo) usa
+    esta mesma passagem, para as duas nao discordarem.
+    """
+    in_code = False
+    fence = ""
+    for number, line in enumerate(lines, start=1):
+        if marker := _FENCE.match(line):
+            if not in_code:
+                in_code, fence = True, marker.group("fence")[:3]
+            elif marker.group("fence").startswith(fence):
+                in_code = False
+            yield number, line, None
+            continue
+        title = None if in_code else _HEADING.match(line)
+        heading = Heading(len(title.group("level")), title.group("text")) if title else None
+        yield number, line, heading
+
+
+def first_heading(text: str) -> str | None:
+    """O primeiro titulo do documento, que serve de titulo dele."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return next((h.text for _, _, h in scan_headings(lines) if h is not None), None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,27 +96,18 @@ class DocumentChunker:
         trail: list[str] = []
         current: list[str] = []
         heading, first_line = "", 1
-        in_code = False
-        fence = ""
 
         def close() -> None:
             if any(line.strip() for line in current):
                 sections.append(_Section(heading, first_line, tuple(current)))
 
-        for number, line in enumerate(lines, start=1):
-            if marker := _FENCE.match(line):
-                if not in_code:
-                    in_code, fence = True, marker.group("fence")[:3]
-                elif marker.group("fence").startswith(fence):
-                    in_code = False
-            title = None if in_code else _HEADING.match(line)
-            if title:
-                close()
-                level = len(title.group("level"))
-                trail = [*trail[: level - 1], title.group("text")]
-                heading, first_line, current = " > ".join(trail), number, [line]
-            else:
+        for number, line, title in scan_headings(lines):
+            if title is None:
                 current.append(line)
+            else:
+                close()
+                trail = [*trail[: title.level - 1], title.text]
+                heading, first_line, current = " > ".join(trail), number, [line]
         close()
         return sections
 

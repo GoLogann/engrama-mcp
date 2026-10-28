@@ -78,6 +78,11 @@ class RegexSecretScanner(SecretScanner):
                 return f"{head}${{{default['name']}{default['op']}{REDACTED}}}{quote}"
             if not value or _NOT_A_VALUE.search(value):
                 return match.group(0)
+            if value.lower() == match.group("key").lower():
+                # `OpenAI(api_key=api_key)`: parametro repassado, nao segredo.
+                # Mascarar estraga exemplo de codigo na documentacao, e o unico
+                # "segredo" que isso deixa passar e a propria palavra da chave.
+                return match.group(0)
             rules.append("key-value")
             return f"{head}{REDACTED}{quote}"
 

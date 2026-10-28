@@ -4,6 +4,7 @@ from neo4j import Driver
 
 from engrama.application.dto.structure_check import CallFact, DataStoreFact, RouteFact
 from engrama.application.ports.graph import StructureReader
+from engrama.domain.entities import Endpoint
 from engrama.domain.value_objects import HttpMethod, HttpRoute
 
 _ROUTES = """
@@ -20,6 +21,14 @@ RETURN m.repo AS caller, e.repo AS target, e.method AS method, e.path AS path,
 _DATASTORES = """
 MATCH (:Repo)-[:STORES_IN {open: true}]->(d:DataStore)
 RETURN d.repo AS repo, d.store_kind AS kind, d.name AS name
+"""
+
+# Um registro por endpoint, nao por evidencia: duas declaracoes da mesma rota
+# (o mesmo endpoint exposto em dois modulos) sao o mesmo no.
+_ENDPOINTS = """
+MATCH (:Module)-[:EXPOSES {open: true}]->(e:Endpoint)
+RETURN DISTINCT e.repo AS repo, e.method AS method, e.path AS path, e.handler AS handler
+ORDER BY repo, method, path
 """
 
 
@@ -39,6 +48,13 @@ class Neo4jStructureReader(StructureReader):
     def datastores(self) -> list[DataStoreFact]:
         records, _, _ = self._driver.execute_query(_DATASTORES, database_=self._database)
         return [DataStoreFact(row["repo"], row["kind"], row["name"]) for row in records]
+
+    def endpoints(self) -> list[Endpoint]:
+        records, _, _ = self._driver.execute_query(_ENDPOINTS, database_=self._database)
+        return [
+            Endpoint(row["repo"], HttpRoute(HttpMethod(row["method"]), row["path"]), row["handler"])
+            for row in records
+        ]
 
     def calls(self) -> list[CallFact]:
         """Uma CALLS carrega a evidencia dos dois lados; os pontos de chamada
