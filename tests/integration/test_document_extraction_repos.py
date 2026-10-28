@@ -43,7 +43,11 @@ def paths_of(documents):
 
 
 def test_le_os_documentos_dos_repos(documents_by_repo):
-    assert paths_of(documents_by_repo["phishforge-frontend"]) == {"README.md", "package.json"}
+    assert paths_of(documents_by_repo["phishforge-frontend"]) == {
+        "README.md",
+        "nginx.conf.template",
+        "package.json",
+    }
     assert paths_of(documents_by_repo["phishing_quest"]) == {"README.md"}
     quest_api = paths_of(documents_by_repo["phishing-quest-api"])
     assert "PLANO_EXECUCAO.md" in quest_api

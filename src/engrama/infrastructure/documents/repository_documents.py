@@ -9,7 +9,11 @@ from engrama.domain.services import RouteNormalizer, first_heading
 from engrama.domain.value_objects import Evidence
 from engrama.domain.value_objects.document_facts import DocumentFile, DocumentKind, RouteMention
 
-SUFFIXES = (".md", ".config")
+# `.conf.template` precisa estar explicito: ele termina em `.template`, e nao
+# em `.conf`, e o casamento e por fim de nome. `.cfg` e `.ini` ficaram de fora
+# porque nenhum arquivo dos quatro repos usa — a regra enumera o que existe
+# (ADR 0010), e nao o que poderia existir.
+SUFFIXES = (".md", ".config", ".conf", ".conf.template")
 ROOT_FILES = ("package.json",)
 # Diretorios cujo conteudo nao e documentacao do projeto: dados de entrada
 # (`data/articles/phishing_examples.md` sao exemplos de phishing, nao docs),

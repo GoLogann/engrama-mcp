@@ -27,6 +27,7 @@ def test_le_readme_docs_adrs_e_configuracao():
             "docs/architecture.md": "# Arquitetura\n\ntexto",
             "docs/decisoes/0001-rota.md": "# ADR 0001\n\n- **Status:** aceita\n",
             "migrate/flyway.config": "flyway.url=jdbc:postgresql://host:5432/db",
+            "nginx.conf.template": "location /api/v1/ { proxy_pass ${API_UPSTREAM}; }",
             "package.json": '{"name": "forge"}',
             "app/main.py": "print('nao e documento')",
         }
@@ -37,6 +38,7 @@ def test_le_readme_docs_adrs_e_configuracao():
         "docs/architecture.md",
         "docs/decisoes/0001-rota.md",
         "migrate/flyway.config",
+        "nginx.conf.template",
         "package.json",
     ]
 
@@ -135,3 +137,19 @@ def test_metodo_em_minuscula_nao_e_citacao_de_rota():
     facts = extract({"docs/api.md": "get /api/v1/x nao e citacao"})
 
     assert facts.mentions == ()
+
+
+def test_configuracao_do_servidor_web_e_documento():
+    """`nginx.conf.template` diz como o frontend chega na API em producao, que
+    e a pergunta t08. E documentacao de operacao, nao dado (ADR 0010, emenda
+    de 28/10/2026). `.conf.template` precisa casar por fim de nome composto:
+    o sufixo do arquivo e `.template`, nao `.conf`."""
+    facts = extract(
+        {
+            "nginx.conf": "listen 3000;",
+            "nginx.conf.template": "proxy_pass ${API_UPSTREAM};",
+            "index.html.template": "<html>",
+        }
+    )
+
+    assert paths(facts) == ["nginx.conf", "nginx.conf.template"]
