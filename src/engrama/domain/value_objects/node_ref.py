@@ -15,6 +15,7 @@ class NodeKind(StrEnum):
     CONCEPT = "Concept"
     DOC = "Doc"
     DECISION = "Decision"
+    CHUNK = "Chunk"
     ISSUE = "Issue"
     EPISODE = "Episode"
     PERSON = "Person"

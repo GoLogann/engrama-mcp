@@ -45,10 +45,36 @@ def test_mascara_credenciais_dos_repos(line, secret):
         "POSTGRES_DB: phishing_quest",
         "      API_KEY: ${API_KEY:-}",
         "      API_KEY: ${API_KEY}",
+        # Argumento repassando a variavel do mesmo nome, dentro de uma chamada:
+        # mascarar estraga o exemplo de codigo e nao esconde nada.
+        "        self.client = OpenAI(api_key=api_key)",
+        "    client = Client(API_KEY=API_KEY)",
+        "        conn = connect(password=password)",
     ],
 )
 def test_preserva_referencias_e_nomes(line):
     assert scanner.redact(line).text == line
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # Valor de verdade ao lado da chave, no mesmo formato de chamada.
+        (
+            "self.client = OpenAI(api_key=sk-nao-e-repasse)",
+            f"self.client = OpenAI(api_key={REDACTED})",
+        ),
+        # Literal entre aspas igual a palavra da chave ainda pode ser a senha.
+        ('api_key = "api_key"', f'api_key = "{REDACTED}"'),
+        # Fora de chamada, valor igual a chave e credencial de desenvolvimento.
+        ("flyway.password=password", f"flyway.password={REDACTED}"),
+        ("password: password", f"password: {REDACTED}"),
+        ("DB_PASSWORD=db_password", f"DB_PASSWORD={REDACTED}"),
+        ("JWT_SECRET: jwt_secret", f"JWT_SECRET: {REDACTED}"),
+    ],
+)
+def test_so_repasse_dentro_de_chamada_escapa_da_mascara(line, expected):
+    assert scanner.redact(line).text == expected
 
 
 def test_mantem_a_chave_e_informa_a_linha():

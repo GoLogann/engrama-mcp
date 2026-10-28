@@ -5,7 +5,7 @@ from datetime import datetime
 from engrama.application.dto.structure_check import CallFact, DataStoreFact, RouteFact
 from engrama.application.ports.graph import GraphWriter, StructureReader
 from engrama.domain.entities import DataStore, Edge, EdgeKind, Endpoint, Node
-from engrama.domain.services import StructuralGraph
+from engrama.domain.services import RepositoryGraph
 
 
 @dataclass
@@ -29,12 +29,16 @@ class InMemoryGraph(GraphWriter, StructureReader):
     def ensure_schema(self) -> None:
         self.schema_ready = True
 
-    def write(self, graphs: Mapping[str, StructuralGraph], run_id: str, at: datetime) -> None:
+    def write(self, graphs: Mapping[str, RepositoryGraph], run_id: str, at: datetime) -> None:
         for graph in graphs.values():
             for node in graph.nodes:
                 self.nodes[(node.node_kind.value, node.key)] = node
         for owner, graph in graphs.items():
             for edge in graph.edges:
+                if not self._both_ends_exist(edge):
+                    # Como no Neo4j: `_UPSERT_EDGES` casa as duas pontas com
+                    # MATCH, e a linha cuja ponta nao existe nao grava nada.
+                    continue
                 current = self._open(edge)
                 if current is None:
                     self.edges.append(StoredEdge(edge, owner, run_id))
@@ -69,6 +73,12 @@ class InMemoryGraph(GraphWriter, StructureReader):
                     )
         return facts
 
+    def endpoints(self) -> list[Endpoint]:
+        found = {
+            endpoint.key: endpoint for _, endpoint in self._open_to_endpoints(EdgeKind.EXPOSES)
+        }
+        return [found[key] for key in sorted(found)]
+
     def datastores(self) -> list[DataStoreFact]:
         facts = []
         for stored in self.open_edges(EdgeKind.STORES_IN):
@@ -85,6 +95,9 @@ class InMemoryGraph(GraphWriter, StructureReader):
         for stored in self.open_edges(EdgeKind.CALLS):
             if stored.edge.target not in exposed:
                 stored.open, stored.valid_to = False, at
+
+    def _both_ends_exist(self, edge: Edge) -> bool:
+        return all((ref.kind.value, ref.key) in self.nodes for ref in (edge.source, edge.target))
 
     def _open(self, edge: Edge) -> StoredEdge | None:
         return next(

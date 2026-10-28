@@ -24,6 +24,9 @@ def cli(report: StructureCheckReport | None = None):
     return build_cli(
         build_structural_graph=unused,
         check_structure=(lambda: FakeCheck(report)) if report else unused,
+        index_documents=unused,
+        search_knowledge=unused,
+        measure_source_recall=unused,
     )
 
 

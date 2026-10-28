@@ -1,6 +1,5 @@
 import uuid
 from collections.abc import Collection
-from dataclasses import replace
 
 from engrama.application.dto.ingestion import IngestionReport, RepositorySummary
 from engrama.application.ports.graph import GraphWriter
@@ -8,7 +7,7 @@ from engrama.application.ports.sources import RepositoryCatalog
 from engrama.application.ports.system import Clock
 from engrama.application.use_cases.ingest_repository import IngestRepository
 from engrama.application.use_cases.link_calls_to_routes import LinkCallsToRoutes
-from engrama.domain.services import StructuralGraph, StructuralGraphBuilder
+from engrama.domain.services import RepositoryGraph, StructuralGraphBuilder
 from engrama.domain.value_objects import Validity
 
 
@@ -42,7 +41,7 @@ class BuildStructuralGraph:
         specs = [s for s in catalog.repos if s.repo.name in names]
         repositories = [self._ingest.execute(spec) for spec in specs]
 
-        graphs: dict[str, StructuralGraph] = {}
+        graphs: dict[str, RepositoryGraph] = {}
         for repository in repositories:
             facts = repository.facts
             graphs[repository.spec.repo.name] = self._builder.repository(
@@ -57,7 +56,7 @@ class BuildStructuralGraph:
 
         links = self._link.execute(repositories, catalog.consumes, now)
         for caller, edges in links.edges_by_caller.items():
-            graphs[caller] = replace(graphs[caller], edges=graphs[caller].edges + edges)
+            graphs[caller] = graphs[caller].merged(RepositoryGraph(edges=edges))
 
         self._writer.ensure_schema()
         self._writer.write(graphs, run_id=uuid.uuid4().hex, at=now)

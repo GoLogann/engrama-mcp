@@ -26,6 +26,9 @@ poetry install
 docker compose up -d neo4j
 poetry run engrama ingest         # clona os 4 repos em .cache/ e grava a estrutura no Neo4j
 poetry run engrama check-structure  # Portão 1: confere com o groundtruth
+poetry run engrama index-docs     # indexa README, docs/, ADRs e configuração
+poetry run engrama search "onde ficam as migrations?"   # busca com a fonte de cada pedaço
+poetry run engrama check-sources  # quanto da fonte esperada a busca encontra
 ```
 
 O grafo fica no Neo4j Browser em http://localhost:7474.

@@ -59,6 +59,8 @@ RULES: dict[EdgeKind, EdgeRule] = {
                 (K.DATASTORE, K.REPO),
                 (K.DOC, K.REPO),
                 (K.DECISION, K.REPO),
+                (K.CHUNK, K.DOC),
+                (K.CHUNK, K.DECISION),
             }
         ),
         frozenset(_STRUCTURE),

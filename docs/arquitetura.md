@@ -23,9 +23,9 @@ As duas regras são verificadas pelo [import-linter](https://import-linter.readt
 
 | Camada | Pacote | Conteúdo |
 | --- | --- | --- |
-| Domínio | `engrama.domain.entities` | `Project`, `Repo`, `Module`, `Endpoint`, `DataStore`, `Concept`, `Doc`, `Decision`, `Episode`, `Person`, `Edge` |
+| Domínio | `engrama.domain.entities` | `Project`, `Repo`, `Module`, `Endpoint`, `DataStore`, `Concept`, `Doc`, `Decision`, `Chunk`, `Issue`, `Episode`, `Person`, `Edge` |
 | Domínio | `engrama.domain.value_objects` | `Evidence`, `Provenance`, `Validity`, `NodeRef`, `HttpRoute`, `CallSite` |
-| Domínio | `engrama.domain.services` | Lógica pura sem I/O, como normalizar rotas e casar chamadas com rotas |
+| Domínio | `engrama.domain.services` | Lógica pura sem I/O: normalizar rotas, casar chamada com rota, cortar documento em pedaços, montar os pedaços de grafo de um repo |
 | Aplicação | `engrama.application.ports` | Interfaces que os casos de uso exigem |
 | Aplicação | `engrama.application.use_cases` | Uma classe por caso de uso, com `execute()` |
 | Infraestrutura | `engrama.infrastructure.*` | Um adapter por porta |
@@ -73,7 +73,32 @@ Limitações conhecidas, registradas como diagnóstico quando aparecem:
 - `issue #N` vale para o repo do arquivo, salvo se logo depois (na mesma linha ou na linha de comentário seguinte) vier `do repo <nome>`, `do <nome>` ou `do backend`. Este último resolve pelo `consumes` do repo e só vale quando há exatamente um; com zero ou vários, a citação é ignorada e sai um diagnóstico. Qualquer outra forma de apontar para outro repo continua sendo lida como o repo do arquivo.
 - Um caminho fora da forma canônica (o curinga `*filepath` do Gin, `$id.json` do Dart) vira diagnóstico e só aquela rota é ignorada; a ingestão segue.
 - A relação entre repos vem de `consumes` em `config/repos.yaml`. Um repo que faz chamadas e não declara `consumes` não é relacionado a ninguém numa ingestão parcial; `engrama ingest` sem `--repo` sempre refaz tudo.
-- Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles.
+- Manifests de dependência e Kubernetes ainda não entram: a ontologia não tem nós para eles ([ADR 0008](decisoes/0008-adiar-kubernetes-e-manifestos-de-dependencia.md)).
+
+## Camada de documentação
+
+`engrama index-docs` roda o caso de uso `IndexDocuments`: lê os documentos de cada repo no commit do catálogo, mascara os segredos, corta o texto em pedaços e grava `Doc`, `Decision` e `Chunk` no Neo4j. `engrama search "..."` busca nesses pedaços e mostra a fonte de cada um; `engrama check-sources` mede quantas fontes esperadas pelas perguntas de ouro a busca encontra. As decisões estão no [ADR 0010](decisoes/0010-camada-de-documentacao.md).
+
+| O que entra | O que fica de fora |
+| --- | --- |
+| `*.md`, `*.config` e o `package.json` da raiz | `data/`, `assets/`, `ios/`, `android/`, `macos/`, `windows/`, `linux/`, `web/` e diretórios de teste |
+
+`docs/decisoes/`, `docs/decisions/`, `adr/` e `adrs/` viram `Decision`, com o `status` lido da linha "Status:" do documento; o resto vira `Doc`. O título sai do primeiro título do arquivo (ignorando `#` dentro de bloco de código) ou do nome dele.
+
+Cada pedaço (`Chunk`) guarda a faixa de linhas de onde saiu, para a fonte ser citada como `repo/caminho:linha`, e a trilha de títulos até ele. O corte segue as seções do Markdown: seções curtas seguidas são juntadas até `ENGRAMA_CHUNK_MAX_CHARS` (1500), e seção maior que isso é cortada em limite de linha.
+
+A máscara de segredos (`SecretScanner.redact`) roda aqui, antes de o texto virar nó: o que o grafo guarda é sempre a versão mascarada, e o relatório diz quantos valores foram mascarados em cada repo. A política está em [seguranca.md](seguranca.md).
+
+A busca usa o índice de texto completo do Neo4j com analisador português, atrás da porta `KnowledgeIndex`. A parte vetorial da busca híbrida entra quando houver chave de embeddings, juntando os dois lados por RRF sem mudar a porta.
+
+As arestas da documentação de um repo têm `owner = "<repo>:docs"`, camada separada da estrutura: a aposentadoria de arestas é por dono (ADR 0009), então indexar documentos não encerra o que `engrama ingest` gravou, nem o contrário.
+
+Limitações conhecidas:
+
+- `DOCUMENTED_IN` só nasce de duas evidências diretas: o `README.md` da raiz documenta o repo, e uma rota escrita no texto documenta aquele endpoint. Ligar documento a módulo ou a conceito é leitura de conteúdo e vem com origem `llm`.
+- A rota citada só casa com endpoint do mesmo repo: um documento do frontend que cita rota da API não gera aresta.
+- `index-docs` depende de `ingest`: sem endpoints no grafo, ele indexa e avisa que nenhum era conhecido.
+- A busca de hoje é só por palavra, então pergunta com vocabulário diferente do documento não acha a fonte (medição em `engrama check-sources`).
 
 ## Como estender
 
@@ -86,5 +111,5 @@ Limitações conhecidas, registradas como diagnóstico quando aparecem:
 | Pasta | O que testa | Precisa de |
 | --- | --- | --- |
 | `tests/unit` | Domínio, casos de uso (com fakes), extratores (trechos de código dentro do teste), CLI e o formato das perguntas de ouro | Nada |
-| `tests/contracts` | A mesma suíte contra o fake e contra o adapter real: o grafo (Neo4j) e a árvore de fontes (repositório git local) | Neo4j para o grafo; sem ele, os casos `[neo4j]` são pulados |
-| `tests/integration` | O `GitSourceRepository` sobre um repo git local e o filtro de segredos sobre as linhas reais dos clones | git; os clones em `.cache/repos` (criados por `engrama ingest`), e sem eles esses casos são pulados |
+| `tests/contracts` | A mesma suíte contra o fake e contra o adapter real: o grafo (Neo4j), a busca na documentação (índice de texto completo) e a árvore de fontes (repositório git local) | Neo4j para o grafo e a busca; sem ele, os casos `[neo4j]` são pulados |
+| `tests/integration` | O `GitSourceRepository` sobre um repo git local, o filtro de segredos sobre as linhas reais dos clones e a leitura de documentos dos quatro repos | git; os clones em `.cache/repos` (criados por `engrama ingest`), e sem eles esses casos são pulados |

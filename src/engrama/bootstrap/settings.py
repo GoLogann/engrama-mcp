@@ -25,3 +25,9 @@ class Settings(BaseSettings):
     ground_truth_path: Path = Field(
         default=Path("eval/structure_groundtruth.yaml"), validation_alias="ENGRAMA_GROUND_TRUTH"
     )
+    questions_path: Path = Field(
+        default=Path("eval/golden_questions.yaml"), validation_alias="ENGRAMA_QUESTIONS"
+    )
+    # Tamanho do pedaco de documento indexado. Secoes curtas seguidas sao
+    # juntadas ate aqui; o que passa disso e cortado em limite de linha.
+    chunk_max_chars: int = Field(default=1500, validation_alias="ENGRAMA_CHUNK_MAX_CHARS")

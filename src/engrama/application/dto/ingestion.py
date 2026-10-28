@@ -31,6 +31,20 @@ class Catalog:
     def project_of(self, spec: RepositorySpec) -> Project:
         return next(p for p in self.projects if p.slug == spec.repo.project)
 
+    def only(self, names: Iterable[str]) -> tuple[str, ...]:
+        """Os repos pedidos, na ordem do catalogo. Sem `names`, o catalogo
+        inteiro; um nome fora dele e recusado em vez de ignorado."""
+        requested = set(names)
+        if not requested:
+            return self.repo_names
+        unknown = requested - set(self.repo_names)
+        if unknown:
+            raise UnknownRepository(
+                f"repo fora do catalogo: {', '.join(sorted(unknown))} "
+                f"(catalogo: {', '.join(self.repo_names)})"
+            )
+        return tuple(name for name in self.repo_names if name in requested)
+
     def with_related(self, names: Iterable[str]) -> tuple[str, ...]:
         """Os repos a ingerir para que uma ingestao parcial continue correta.
 
@@ -41,15 +55,7 @@ class Catalog:
         todos os servidores de cada repo que entrou, ate nao faltar nenhum.
         Sem `names`, vale o catalogo inteiro. Devolve na ordem do catalogo.
         """
-        requested = set(names)
-        if not requested:
-            return self.repo_names
-        unknown = requested - set(self.repo_names)
-        if unknown:
-            raise UnknownRepository(
-                f"repo fora do catalogo: {', '.join(sorted(unknown))} "
-                f"(catalogo: {', '.join(self.repo_names)})"
-            )
+        requested = set(self.only(names))
         consumes = self.consumes
         selected = requested | {
             client for client, servers in consumes.items() if requested & set(servers)

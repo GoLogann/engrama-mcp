@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 import pytest
 
 from engrama.application.ports.graph import GraphWriter, StructureReader
-from engrama.domain.entities import Project, Repo, Stack
+from engrama.domain.entities import Doc, Edge, EdgeKind, Endpoint, Project, Repo, Stack
 from engrama.domain.services import RouteMatch, StructuralGraphBuilder
-from engrama.domain.value_objects import Evidence, HttpMethod, HttpRoute, Validity
+from engrama.domain.value_objects import Evidence, HttpMethod, HttpRoute, Provenance, Validity
 from engrama.domain.value_objects.code_facts import CallSite, DeclaredRoute
 from tests.fakes.graph import InMemoryGraph
 
@@ -207,3 +207,28 @@ def test_chamada_sem_destino_fecha_quando_a_rota_some_so_na_api(backend):
     assert own_calls(backend.reader) == []
     (call,) = backend.edge_times("CALLS")
     assert (call.open, call.valid_to) == (False, T1)
+
+
+def test_aresta_com_ponta_que_nao_existe_nao_e_gravada(backend):
+    """A escrita casa as duas pontas: aresta para um no que o grafo nao tem nao
+    grava nada. E o que sustenta a camada de documentacao nao regravar o no do
+    endpoint (ADR 0010) — ela so cria aresta para endpoint que leu do grafo."""
+    builder = StructuralGraphBuilder()
+    validity = Validity.starting(T0)
+    orphan = Edge(
+        EdgeKind.DOCUMENTED_IN,
+        Endpoint(API.name, HttpRoute(HttpMethod.GET, "/api/v1/nao-existe")).ref,
+        Doc(API.name, "contract-README.md", "Contrato").ref,
+        Provenance.extracted(Evidence.in_code(API.name, "contract-README.md", C, 1)),
+        validity,
+    )
+    graph = builder.repository(PROJECT, API, ["router"], [ITEMS], [], [], validity)
+
+    backend.writer.write(
+        {API.name: replace(graph, edges=(*graph.edges, orphan))}, run_id="r1", at=T0
+    )
+
+    assert [(r.line, r.route) for r in own_routes(backend.reader)] == [
+        (10, "GET /api/v1/items/{id}")
+    ]
+    assert backend.edge_times("DOCUMENTED_IN") == []

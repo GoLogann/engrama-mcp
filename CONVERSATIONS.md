@@ -13,7 +13,7 @@ Atualizado em 27/10/2026.
 | Fase 1: grafo estrutural | Portão 1 aprovado (75/75 rotas, 33/33 chamadas, 3/3 bancos). PR #2 mergeado por Logan |
 | Dívidas das Fases 0 e 1 | PR #3 mergeado por Logan |
 | Revisão independente das Fases 0 e 1 | Veredito do revisor: **reprovado** (2 bloqueantes). Todas as correções mergeadas no PR #4 (merge `633baf5`), com CI verde em 3.12 e 3.13. As Fases 0 e 1 estão fechadas |
-| Fase 2: docs, resumos, comunidades | Não iniciada. A parte sem LLM pode começar já; o resto está bloqueado por chaves e custo. Logan avisou em 27/10 que por enquanto não consegue as chaves |
+| Fase 2: docs, resumos, comunidades | Parte sem LLM entregue (PR #6): documentos indexados, busca por texto, `redact` ligado. Resumos, conceitos, comunidades e embeddings seguem bloqueados por chave de API |
 
 ## Pendências abertas
 
@@ -27,6 +27,7 @@ Atualizado em 27/10/2026.
 - [ ] Fornecer `ANTHROPIC_API_KEY` (ou `ant auth login`) e `VOYAGE_API_KEY` no `.env` antes da parte da Fase 2 que usa LLM. Sem previsão: Logan não consegue por enquanto, então o trabalho segue só com o que não precisa delas.
 - [ ] Aprovar o custo dos resumos antes de rodar essa parte (vou estimar com `count_tokens`).
 - [ ] Confirmar `consumes` e `base_path` de `config/repos.yaml`.
+- [ ] Dizer se `nginx.conf.template` e outros arquivos de configuração sem extensão conhecida devem ser indexados. Hoje entram `*.md`, `*.config` e o `package.json` da raiz; a fonte de n12 (`phishforge-frontend/nginx.conf.template:40`) fica fora, e com ela a pergunta não tem como ser respondida pela camada de documentação.
 - [ ] Dizer se o `poetry.toml` (venv dentro do projeto) pode ficar. Foi escolha minha.
 
 **Amostra para conferir** (abra o arquivo na linha e confirme método e caminho completo; semente 2610, estratificada por extrator):
@@ -46,8 +47,9 @@ Atualizado em 27/10/2026.
 
 - [ ] **Origens permitidas por aresta são minha interpretação** (ADR 0004). `DOCUMENTED_IN`, `MENTIONS_CONCEPT` e `ABOUT` precisam ser revalidadas quando as Fases 2 e 3 criarem essas arestas. Uma síntese de reflexão gerada por LLM não cabe hoje como `Episode`.
 - [ ] **Quem gera o `id` do episódio.** `Episode.record` recebe o id pronto. O caso de uso `RecordEpisode` (Fase 3) deve gerar o UUID.
-- [ ] **`RegexSecretScanner.redact` não é chamado em código de produção**, e valores em prosa (o padrão de `API_KEY` em `README.md:36` e `guia_geracao_exemplos.md:153`) passam por ele. Fechar na indexação de documentos (Fase 2) e na saída do MCP (Fase 4). Está em `docs/seguranca.md`.
-- [ ] **A Fase 2 precisa indexar também os arquivos de configuração** (`migrate/flyway*.config`, `package.json`) para as perguntas de ouro n18 e t12. O ADR 0008 foi aceito por Logan: adiar K8s e manifestos até a Fase 5, com gatilho para reabrir se n18, t12 ou parecidas errarem por falta de estrutura.
+- [ ] **Valor de credencial escrito em prosa ainda passa pela máscara** (o padrão de `API_KEY` em `README.md:36` e `guia_geracao_exemplos.md:153`), e agora esses dois textos são indexados. O `redact` já roda na indexação (fechado no PR #6); falta decidir entre montar a lista de valores a partir do compose e dos `.env.example` ou revisar a saída na Fase 4. Está em `docs/seguranca.md`, com as duas limitações medidas.
+- [ ] **n18 e t12 continuam sem fonte recuperável.** Os arquivos já são indexados (PR #6), mas a busca por palavra não os acha: a pergunta de t12 fala de "migrations" e o arquivo diz `flyway`/`migrate`; a de n18 fala de "tecnologias" e o `package.json` lista nomes de pacote. Indexar o caminho do arquivo foi medido e não resolveu. A saída é a parte vetorial da busca, que depende da chave da Voyage. O gatilho do ADR 0008 (reabrir K8s/manifestos) não disparou: a falha é de busca, não de falta de estrutura no grafo.
+- [ ] **Comunidades (Louvain) ficaram fora do PR #6.** Eu tinha oferecido no mesmo pacote. Deixei de fora porque sem resumo nenhuma pergunta de ouro depende de agrupamento, e persistir comunidade exige uma família de nó nova que a etapa de resumo talvez queira diferente. Entra junto com `SummarizeCommunities`.
 - [ ] **Módulos (98) não têm groundtruth.** São derivados da lista de arquivos versionados. As citações de issue foram conferidas por regex (208/208 linhas), mas não à mão.
 - [ ] **Citação de issue de outro repo em outras formas** ("issue #N do módulo X do backend") ainda é lida como do próprio repo. Só `do repo <nome>`, `do <nome>` e `do backend` são resolvidos.
 - [ ] **`consumes` não tem checagem automática**, e um repo que faz chamadas sem declarar `consumes` não entra por relação numa ingestão parcial.
@@ -245,3 +247,67 @@ Só acrescento no fim. Cada entrada: o que foi feito, decisões, reflexões e ap
 - Não reescrevi a entrada "Criação do CONVERSATIONS.md": o diário só recebe acréscimos no fim.
 
 **Aprendizado.** Minha memória dizia "nunca comitar este arquivo". Uma regra salva como memória fica velha quando o Logan muda de ideia; atualizei a memória junto com o arquivo, para a próxima sessão não desfazer isto.
+
+### 27/10/2026 — Fase 2 sem LLM: documentos indexados e busca por texto (PR #6)
+
+**Pedido de Logan.** Sem as chaves de API por enquanto, seguir a recomendação que eu tinha dado: a parte da Fase 2 que não usa LLM e a primeira medida de "fonte correta".
+
+**Feito.** Branch empilhada em cima da do diário (PR #5), porque o diário precisa existir aqui para eu acrescentar esta entrada.
+- `StructuralGraph` virou `RepositoryGraph`: o pedaço de grafo de um repo passou a carregar nós de documentação, então o nome por camada deixou de valer.
+- Domínio: nó `Chunk` (pedaço com faixa de linhas), `DocumentChunker` (seções de Markdown, cerquilha dentro de bloco de código não é título), `RouteMentionMatcher` e `DocumentationGraphBuilder`.
+- `engrama index-docs` indexa 18 documentos dos quatro repos (16 `Doc` e 2 `Decision`) em 121 pedaços, com 37 endpoints documentados e 6 valores mascarados. `engrama search` busca com a fonte; `engrama check-sources` mede a recuperação.
+- Contrato novo de `KnowledgeIndex`, rodando contra o índice em memória e contra o índice de texto completo do Neo4j real.
+- 436 testes passando; Portão 1 segue 100% depois de indexar documentos duas vezes, que é a prova de que a separação de donos funciona.
+
+**Medição (o item 2 que eu tinha proposto).** Das 92 fontes das perguntas de ouro, 22 são documento indexado; as outras 70 são código e pertencem à camada de estrutura. Com k=10, a busca acha o arquivo certo em 18 das 22 (82%) e o pedaço cobre a linha citada em 79%. Comparei configurações do índice em vez de escolher por intuição: analisador português dá 82%, o padrão dá 68% (os documentos são em português), e indexar também o caminho do arquivo não mudou nada. Teria apostado que o caminho ajudaria em t12; não ajudou, porque a pergunta diz "migrations" e o caminho diz `migrate`.
+
+As 4 fontes que faltam são todas de vocabulário diferente do da pergunta — exatamente o que a metade vetorial da busca resolve. O alvo do Portão 2 é 90% de fonte correta, então registro: hoje a camada de documentação está em 82% com busca lexical, e não é honesto prometer os 90% sem embeddings.
+
+**Decisões.**
+- **Pedaço, não documento, é a unidade de busca.** `docs/integracao_api.md` tem 983 linhas, e a fonte citada precisa apontar para a linha, como as fontes das perguntas de ouro. Sem sobreposição entre pedaços, para a faixa de linhas continuar exata; reavaliar quando a parte vetorial entrar.
+- **Dono próprio por camada** (`<repo>:docs`). A aposentadoria de arestas é por dono (ADR 0009); se a documentação usasse o nome do repo, indexar documentos fecharia todas as arestas da estrutura. Também permite reindexar documento sem reextrair código, o que vai importar quando essa etapa gastar LLM. Virou teste.
+- **`DOCUMENTED_IN` só com evidência direta:** README da raiz documenta o repo, rota escrita no texto documenta aquele endpoint. Considerei ligar o README de um diretório ao módulo dele, e desisti: o nó `Module` de `docs/` pode não existir (a estrutura só cria módulo onde há código) e a aresta sumiria em silêncio, porque a escrita casa os dois lados com `MATCH`.
+- **O nó do endpoint não entra no grafo da documentação.** A escrita faz `SET n += row`; regravar o endpoint sem `handler` apagaria o que a estrutura sabe. Virou teste.
+- **Rota citada casa por sufixo** quando o documento escreve sem o prefixo do servidor, e só se for um único endpoint. `GET /users/{id}` no `PLANO_EXECUCAO.md` casa com três endpoints e por isso é recusada, mesmo sendo quase certo que fala de `/api/v1/users/{id}`: é a mesma política das chamadas na Fase 1.
+- **Rota citada que nenhum endpoint expõe é achado, não defeito.** São 5, entre elas o `POST /users` do ADR 0001 — a rota que dava 404 e motivou o próprio ADR. O relatório mostra em vez de esconder.
+- **O que conta como documentação** exclui `data/`, `ios/` e companhia. `data/articles/phishing_examples.md` tem 1490 linhas de exemplos de phishing: indexado, faria qualquer pergunta sobre e-mail casar com ele.
+- Comunidades ficaram para quando houver resumo (ver pendências).
+
+**Erros meus.**
+- Pus `}` na lista de pontuação a remover do fim de uma rota citada, então `/emails/{email_id}` virava `/emails/{email_id` e caía como rota inválida. Dez diagnósticos na primeira rodada real; nenhum teste meu cobria rota que termina em parâmetro. Corrigi e cobri.
+- Escrevi "7 valores mascarados" no `docs/seguranca.md` e na mensagem do commit a partir de uma medição anterior à correção do falso positivo. São 6. Refiz o commit e troquei a frase por uma tabela, com arquivo e linha de cada um.
+- Meus próprios testes erraram quatro vezes antes do código: contei 3 nós `Doc` onde há 4, usei `set()` em `StoredEdge` que não é hashable, deixei uma linha de asserção inútil colada de rascunho, e no teste de integração afirmei que a senha não aparece no arquivo inteiro.
+- Rodei um script de refatoração cuja expressão não casou nada (o formatador já tinha quebrado as linhas antes), e ele inseriu um helper que ficava sem uso. A asserção do script barrou a gravação.
+
+**Achados que só apareceram rodando contra os repos de verdade.**
+- O filtro de segredos mascarava `OpenAI(api_key=api_key)` num exemplo de código da documentação. Não é segredo, é parâmetro repassado: o valor é a própria palavra da chave. Corrigi com a regra mais estreita que resolve o caso, e a mutação prova que os dois testes novos reprovam sem ela.
+- A senha de desenvolvimento do `flyway.config` da phishforge-api é a palavra `phishforge`, que também é o nome do banco, do usuário e do host. Não existe máscara por valor que tire isso do texto sem destruir o documento; a máscara age na atribuição, e o teste confere a linha da senha. Está em `docs/seguranca.md`.
+
+**Aprendizados.**
+- Medir é barato e desmente palpite: duas decisões do índice (analisador e caminho) foram resolvidas por medição em minutos, e uma delas contra o que eu esperava.
+- O índice de texto completo do Neo4j é assíncrono. Sem `db.awaitIndexes` o contrato buscava antes de o pedaço estar indexado, e falhava de forma intermitente.
+- Rodar contra os quatro repos antes de escrever os testes do extrator achou um defeito que eu não tinha imaginado. Vale fazer a primeira rodada real cedo, mas o teste tem que vir atrás — senão o defeito volta.
+
+**Pendências geradas.** A metade vetorial da busca e as 4 fontes que faltam; comunidades; `DOCUMENTED_IN` de documento para módulo e conceito, que depende de LLM; rota citada entre repos diferentes; pedaços sem sobreposição; qual arquivo de configuração conta como documento (`nginx.conf.template` da fonte de n12 está fora).
+
+### 27/10/2026 — Revisão da Fase 2 e correções (ainda no PR #6)
+
+**Feito.** Rodei o `revisor-de-entregas` (agora registrado de verdade como tipo de agente) antes de abrir o PR. Veredito: aprovado com ressalvas, nenhum bloqueante, 6 achados importantes e 7 sugestões. O revisor conferiu por conta própria os 121 pedaços contra os arquivos (faixas sem sobreposição e sem perder linha), a preservação de `valid_from`/`ingested_at` na reindexação, e varreu os 4 clones procurando valor de credencial no texto indexado.
+
+**Reproduzi cada achado antes de agir**, porque relatório de agente é saída de modelo. Os quatro que eu conferi com script bateram.
+
+**Corrigido.**
+- **I1, o mais sério.** Minha exceção do filtro de segredos (`valor == chave`) ficou larga demais e desligava a regra 2 para a credencial de desenvolvimento mais comum: `flyway.password=password`, `password: password`, `DB_PASSWORD=db_password` e `api_key = "api_key"` passavam intactos. Nos 4 repos de hoje não vazava nada, mas era buraco aberto. Agora exige as três condições juntas: sem aspas, valor igual à chave e um `(` antes na linha, ou seja, argumento repassado dentro de uma chamada. Os seis casos viraram teste.
+- **I2, o mais importante para a honestidade do número.** A CLI dizia que as 70 fontes fora da conta estavam fora "por serem código", o que eu nunca verifiquei — e com isso a pergunta t08 desaparecia inteira da medição, porque as fontes dela são `nginx.conf.template`. Agora o relatório diz "fora do índice de documentos", mostra a distribuição por extensão (`.template 4` salta à vista) e nomeia as perguntas da camada de documentação que ficaram sem nenhuma fonte medida, com as fontes de cada uma. São três: n02 e t09 têm fonte só em código, e quem responde é a camada de estrutura; t08 é buraco de cobertura de verdade.
+- **I3.** `endpoints_documented` somava arestas, não endpoints distintos: eu reportei 40, são 37. Também contei 16 documentos onde são 18 (16 `Doc` e 2 `Decision`). Corrigi a métrica e os números nos documentos.
+- **I4.** Uma pergunta com `AND`, `OR` ou `NOT` solto derrubava a busca: o Lucene recusava a consulta e o erro subia cru. Cada palavra passou a ir entre aspas. Virou caso de contrato nos dois backends.
+- **I6.** O fake do grafo guardava aresta cuja ponta não existe, enquanto o Neo4j descarta em silêncio — e é justamente esse descarte que sustenta o ADR 0010 não regravar o nó do endpoint. Alinhei o fake e fixei no contrato; a mutação mostra o caso reprovando no fake sem a correção.
+- **I5.** Os três comandos novos não tinham teste nenhum. Agora têm oito, justamente sobre os rótulos de I2 e I3.
+- **S1, S2, S3, S5.** Pedaço só de linhas vazias não vira `Chunk` inválido; o ADR deixou de prometer trilha de títulos que o código não dá; as consultas de leitura vão com `routing_="r"`; `ChunkHit` já leva `ingested_at`, que toda resposta de tool precisa devolver.
+
+**Não aceitei um.** S4 pedia condicionar `_CLOSE_ORPHAN_CALLS` à escrita que traz `EXPOSES`, para desacoplar as camadas. O argumento é bom, mas hoje a consulta é inócua (conferido) e mexer nela arrisca deixar uma `CALLS` órfã aberta sem ganho nenhum agora. Fica registrado como acoplamento conhecido.
+
+**Aprendizados.**
+- Meus dois erros de número (40 endpoints, 16 documentos) vieram do mesmo hábito: contar arestas e relatar como coisas, e somar um campo achando que era o total. Métrica que vai para o relatório merece conferência no banco, com `count(DISTINCT ...)`.
+- O achado I2 é o tipo de defeito que nenhum teste pega, porque o código fazia o que eu escrevi: o problema era o rótulo afirmar mais do que a medida sustenta. Revisor com contexto limpo é bom exatamente nisso.
+- Ao estreitar uma regra de segurança, escrever o caso contrário junto: os seis casos de I1 estão no teste, e três deles são o que a versão anterior deixava passar.

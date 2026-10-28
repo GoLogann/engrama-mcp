@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterator
 from datetime import datetime
 
+from engrama.application.dto.documentation import DocumentFacts
 from engrama.application.dto.ingestion import Catalog, CodeFacts, RepositorySpec
 from engrama.domain.entities import Repo
 
@@ -49,3 +50,15 @@ class CodeExtractor(ABC):
 
     @abstractmethod
     def extract(self, tree: SourceTree, spec: RepositorySpec) -> CodeFacts: ...
+
+
+class DocumentExtractor(ABC):
+    """Le os documentos de um repo (README, docs, ADRs, configuracao).
+
+    Porta separada do `CodeExtractor` porque quem consome uma nao consome a
+    outra: a ingestao da estrutura nao quer documentos, e a indexacao nao
+    quer rotas (segregacao de interfaces).
+    """
+
+    @abstractmethod
+    def extract(self, tree: SourceTree, spec: RepositorySpec) -> DocumentFacts: ...
